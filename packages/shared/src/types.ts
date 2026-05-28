@@ -4,6 +4,7 @@ export interface WorldCandidate {
   body_id: string;
   system_id: string;
   system_name: string;
+  body_position: number;    // 1-based ordinal within system by orbit (e.g. 3 = "Sol 3")
   world_type: string;
   atmosphere_code: string;
   hydrographics_code: number;
@@ -14,6 +15,16 @@ export interface WorldCandidate {
   rvm: number;
   habitability: number;
   dist_pc: number;
+}
+
+export interface WorldListParams {
+  center_x_pc?: number;
+  center_y_pc?: number;
+  center_z_pc?: number;
+  max_dist_pc: number;      // required — prevents unbounded scans
+  min_habitability?: number;
+  limit?: number;
+  offset?: number;
 }
 
 // ── Colony master ─────────────────────────────────────────────────────────────

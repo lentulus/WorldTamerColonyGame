@@ -1,0 +1,84 @@
+:root {
+  --color-bg:      #1a1a2e;
+  --color-surface: #16213e;
+  --color-border:  #0f3460;
+  --color-accent:  #e94560;
+  --color-text:    #eaeaea;
+  --color-muted:   #888;
+  --color-warn:    #c04040;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  padding: 1rem;
+}
+
+h2 { margin-bottom: 0.75rem; color: var(--color-accent); }
+
+/* ── World list ─────────────────────────────────────────────────────────────── */
+
+.world-list { max-width: 900px; }
+
+.wl-filters {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.wl-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: var(--color-muted);
+  font-size: 0.85em;
+}
+
+.wl-filters input {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 0.3rem 0.5rem;
+  width: 100px;
+}
+
+button {
+  background: var(--color-border);
+  border: 1px solid var(--color-accent);
+  color: var(--color-text);
+  padding: 0.4rem 1rem;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { background: var(--color-accent); }
+button:disabled { opacity: 0.5; cursor: default; }
+
+.wl-status { margin-bottom: 0.5rem; min-height: 1.2em; }
+
+.wl-table { width: 100%; border-collapse: collapse; }
+
+.wl-table th {
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.3rem 0.5rem;
+  color: var(--color-muted);
+  font-weight: normal;
+}
+
+.wl-table td {
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--color-surface);
+}
+
+.wl-table tr:hover td { background: var(--color-surface); }
+
+.wl-select-btn {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.85em;
+}

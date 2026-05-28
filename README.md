@@ -29,7 +29,7 @@ Planet data (star type, axial tilt, atmosphere, orbital period, resource richnes
 
 | Layer | Technology |
 |---|---|
-| Server | TypeScript, [Hono](https://hono.dev), Node.js (port 3001) |
+| Server | TypeScript, [Hono](https://hono.dev), Node.js (port 3002) |
 | Colony database | SQLite via `node:sqlite` (built into Node 22+) |
 | Star/planet data | DuckDB reading Meridian parquet files (read-only) |
 | Client | TypeScript, Vite (port 5173) |
@@ -53,7 +53,7 @@ git clone <repo>
 cd WorldTamer
 cp .env.example .env        # edit paths to match your system
 pnpm install
-pnpm dev                    # starts server on :3001 and client on :5173
+pnpm dev                    # starts server on :3002 and client on :5173
 ```
 
 Open `http://localhost:5173` in your browser.
@@ -66,7 +66,7 @@ The colony SQLite database is created automatically at the path in `COLONY_DB` o
 
 | Variable | Description | Default |
 |---|---|---|
-| `PORT` | Server port | `3001` |
+| `PORT` | Server port | `3002` |
 | `MERIDIAN_DATA` | Path to the Meridian parquet directory | `/Volumes/Lexar/MeridianData` |
 | `COLONY_DB` | Path for the colony SQLite database file | `/Users/lentulus/databases/worldtamer.db` |
 

@@ -261,7 +261,7 @@ Three panels, same layout philosophy as the Worlds Ship Design Tool.
 | D-4 | Armed forces scope? | AFL headcount and power draw only. No weapons, vehicles, or readiness mechanics. Data model leaves room for an armed forces detail table without restructuring. |
 | D-5 | Growing season model? | Sinusoidal φ(t) from orbit_au and axial tilt. Each world gets its own seasonal character. |
 | D-6 | Land tracking? | Abstract — total km² per use category, no hex map. Land data structured so per-hex records could replace it in a future mapping integration. |
-| D-7 | Port number? | 3001 (avoids collision with Worlds on 3000). |
+| D-7 | Port number? | 3002 (avoids collision with Worlds on 3000). |
 
 ---
 
