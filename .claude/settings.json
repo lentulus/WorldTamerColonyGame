@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init *)",
+      "Read(//Users/lentulus/.claude/projects/-Users-lentulus-projects-worlds/memory/**)"
+    ]
+  }
+}

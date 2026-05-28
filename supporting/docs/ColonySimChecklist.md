@@ -17,47 +17,31 @@ Working-style rules: [PROCEDURE.md](../../PROCEDURE.md).
 
 **Goal:** pnpm workspace running; server starts on port 3001; client served by Vite; shared types package; SQLite schema created with all reference tables seeded from WTH data.
 
-- [ ] **0.1 [AI]** Create workspace root: `package.json` (private, workspaces), `pnpm-workspace.yaml`.
+- [x] **0.1 [AI]** Create workspace root: `package.json` (private, workspaces), `pnpm-workspace.yaml`.
 
-- [ ] **0.2 [AI]** Create `packages/shared/`: `package.json`, `tsconfig.json`, `src/types.ts` (skeleton — Colony, ColonyTurn, WorldCandidate, TurnResolution, AllocationRequest types).
+- [x] **0.2 [AI]** Create `packages/shared/`: `package.json`, `tsconfig.json`, `src/types.ts`.
 
-- [ ] **0.3 [AI]** Create `server/`: `package.json`, `tsconfig.json`, `src/main.ts` (port 3001), `src/app.ts` (Hono skeleton), `src/config.ts` (reads MERIDIAN_DATA, COLONY_DB, PORT from `.env`).
+- [x] **0.3 [AI]** Create `server/`: `package.json`, `tsconfig.json`, `src/main.ts`, `src/app.ts`, `src/config.ts`.
 
-- [ ] **0.4 [AI]** Create `client/`: `package.json`, `vite.config.ts`, `tsconfig.json`, `index.html`, `src/main.ts` (skeleton).
+- [x] **0.4 [AI]** Create `client/`: `package.json`, `vite.config.ts`, `tsconfig.json`, `index.html`, `src/main.ts`.
 
-- [ ] **0.5 [HUMAN]** Approve package installation *(double-approval gate)*. Packages: server needs `hono`, `@hono/node-server`, `better-sqlite3`, `@types/better-sqlite3`, `duckdb-async`, `tsx`, `typescript`; client needs `vite`, `typescript`; shared needs `typescript`.
+- [x] **0.5 [HUMAN]** Approved package installation. duckdb compiled from source (no arm64/Node25 pre-built binary).
 
-- [ ] **0.6 [AI]** Run `pnpm install`.
+- [x] **0.6 [AI]** `pnpm install` complete. Build scripts approved for duckdb + esbuild in `pnpm-workspace.yaml`.
 
-- [ ] **0.7 [AI]** Write `supporting/sql/schema.sql` — all tables:
-  - `colonies` (master record)
-  - `colony_turns` (one row per completed month)
-  - `colony_events` (active events log)
-  - `ref_agriculture_tl` (TL 0–15, from WTH table)
-  - `ref_industry_tl` (TL 0–15, from WTH table)
-  - `ref_materials_tl` (TL 0–15, from WTH table)
-  - `ref_transport_tl` (TL 0–8, from WTH table)
-  - `ref_housing_tl` (TL 0–15, from WTH table)
-  - `ref_sn_table` (SN band → output DM + political DM)
-  - `ref_ss_table` (SS band → political DM)
-  - `ref_sl_starting_value` (home TL → starting goods value per person)
-  - `ref_output_roll` (D20 result → multiplier)
-  - `ref_political_table` (roll result → event label, output DM, track movement)
-  - `ref_random_events` (D20 → event label, effects, political DM)
-  - `ref_weather_outcomes` (adjusted D20 → outcome)
-  - `ref_weather_factor_dms` (star spectral, axial tilt band, hydrographics → DM value)
+- [x] **0.7 [AI]** `supporting/sql/schema.sql` written — 3 operational tables + 10 ref tables.
 
-- [ ] **0.8 [AI]** Write `supporting/sql/seed.sql` — full INSERT data for all `ref_*` tables from WTH source.
+- [x] **0.8 [AI]** `supporting/sql/seed.sql` written — full WTH data for all ref tables.
 
-- [ ] **0.9 [AI]** Implement `server/src/db/colony.ts`: opens SQLite at COLONY_DB path, runs `schema.sql` and `seed.sql` on first run (idempotent: checks if tables exist before seeding).
+- [x] **0.9 [AI]** `server/src/db/colony.ts` — opens SQLite, runs schema + seed idempotently on startup.
 
-- [ ] **0.10 [AI]** Wire DB init into `app.ts` startup. Add a `GET /api/health` route returning `{ok: true, month: current_month | null}`.
+- [x] **0.10 [AI]** `GET /api/health` returns `{ok:true}`. DB init wired into `buildApp()`.
 
-- [ ] **0.11 [AI]** Add `pnpm dev` scripts: `concurrently` server + client. Verify server starts on 3001 and client dev server starts on 5173.
+- [x] **0.11 [AI]** `pnpm dev` runs server (3001) + client (5173) concurrently.
 
-- [ ] **0.12 [UI]** Browser shows blank client page. `GET http://localhost:3001/api/health` returns `{ok: true}`.
+- [x] **0.12 [UI]** Player confirmed: browser shows page, `/api/health` returns 200.
 
-- [ ] **0.13 [HUMAN]** Approve commit *(double-approval gate)*: `scaffold: workspace, server (port 3001), client, schema, reference data seed`.
+- [x] **0.13 [HUMAN]** Committed `690d54e`: `scaffold: workspace, server (port 3001), client, schema, reference data seed`.
 
 ---
 
