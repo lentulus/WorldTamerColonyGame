@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(git init *)",
-      "Read(//Users/lentulus/.claude/projects/-Users-lentulus-projects-worlds/memory/**)"
+      "Read(//Users/lentulus/.claude/projects/-Users-lentulus-projects-worlds/memory/**)",
+      "Bash(pnpm --filter server test)",
+      "Bash(pnpm server *)",
+      "Bash(pnpm --filter server test --reporter=verbose src/engine/founding.test.ts)"
     ]
   }
 }
