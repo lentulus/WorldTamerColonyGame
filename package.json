@@ -1,0 +1,14 @@
+{
+  "name": "worldtamer",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter server dev\" \"pnpm --filter client dev\"",
+    "build": "pnpm --filter shared build && pnpm --filter server build && pnpm --filter client build",
+    "server": "pnpm --filter server dev",
+    "client": "pnpm --filter client dev",
+    "test": "pnpm -r run test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

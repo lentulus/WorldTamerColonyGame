@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Databases — data files are not in the repo; schema and seeds are
+*.db
+*.sqlite
+*.sqlite3
+
+# Large binary data (Meridian parquet, DuckDB files)
+*.parquet
+*.duckdb
+*.duckdb.wal
+
+# Logs
+pnpm-debug.log*
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Test coverage
+coverage/

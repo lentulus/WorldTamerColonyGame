@@ -1,0 +1,25 @@
+{
+  "name": "server",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx --env-file=../.env src/main.ts",
+    "build": "tsc",
+    "start": "node --env-file=../.env dist/main.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@worldtamer/shared": "workspace:*",
+    "duckdb": "^1.1.3",
+    "hono": "^4.7.10"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.19",
+    "@vitest/coverage-v8": "^4.1.7",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.7"
+  }
+}
