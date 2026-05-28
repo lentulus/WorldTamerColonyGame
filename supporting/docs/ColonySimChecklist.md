@@ -49,24 +49,24 @@ Working-style rules: [PROCEDURE.md](../../PROCEDURE.md).
 
 **Goal:** Player can browse habitable worlds from Meridian and select one for their colony.
 
-- [ ] **1.1 [AI]** Write red test in `server/src/db/meridian.test.ts`:
+- [x] **1.1 [AI]** Write red test in `server/src/db/meridian.test.ts`:
   - `getHabitableWorlds()` returns at least one world with `world_type`, `atmosphere_code`, `axial_tilt_deg`, `hydrographics`, `orbit_au`, `rvm`, `habitability`, `star_spectral` populated.
   - `getHabitableWorlds()` returns only worlds with `habitability >= 1` and world_type containing "Garden".
   - Report red.
 
-- [ ] **1.2 [HUMAN]** Review red tests — confirm they capture the right acceptance criteria.
+- [x] **1.2 [HUMAN]** Review red tests — confirm they capture the right acceptance criteria.
 
-- [ ] **1.3 [AI]** Implement `server/src/db/meridian.ts`: `getHabitableWorlds(filters?)` — DuckDB query joining `systems/`, `bodies/`, `physical/` with the Worlds project JOIN pattern (`system_id` + `body_id`). Returns `WorldCandidate[]`.
+- [x] **1.3 [AI]** Implement `server/src/db/meridian.ts`: `getHabitableWorlds(filters?)` — DuckDB query joining `systems/`, `bodies/`, `physical/` with the Worlds project JOIN pattern (`system_id` + `body_id`). Returns `WorldCandidate[]`.
 
-- [ ] **1.4 [AI]** Tests pass green.
+- [x] **1.4 [AI]** Tests pass green.
 
-- [ ] **1.5 [AI]** Add `GET /api/worlds` route with optional query params: `min_habitability`, `max_dist_pc`, `spectral`. Returns `WorldCandidate[]`.
+- [x] **1.5 [AI]** Add `GET /api/worlds` route with optional query params: `min_habitability`, `max_dist_pc`, `spectral`. Returns `WorldCandidate[]`.
 
-- [ ] **1.6 [AI]** Implement client `WorldList` view: filterable table showing system name, world type, atmosphere, habitability, RVM, distance. "Select" button on each row navigates to founding form.
+- [x] **1.6 [AI]** Implement client `WorldList` view: filterable table showing system name, world type, atmosphere, habitability, RVM, distance. "Select" button on each row navigates to founding form.
 
-- [ ] **1.7 [UI]** Player opens app, sees world list, can filter by habitability. Rows are selectable.
+- [x] **1.7 [UI]** Player opens app, sees world list, can filter by habitability. Rows are selectable.
 
-- [ ] **1.8 [HUMAN]** Approve commit *(double-approval gate)*: `green: world selection — Meridian query, /api/worlds, WorldList view`.
+- [x] **1.8 [HUMAN]** Approve commit *(double-approval gate)*: `green: world selection — Meridian query, /api/worlds, WorldList view`.
 
 ---
 
@@ -74,30 +74,30 @@ Working-style rules: [PROCEDURE.md](../../PROCEDURE.md).
 
 **Goal:** Player fills a founding form for the selected world, submits it, and sees the colony status panel with turn 0 state.
 
-- [ ] **2.1 [AI]** Write red tests in `server/src/db/colony.test.ts`:
+- [x] **2.1 [AI]** Write red tests in `server/src/db/colony.test.ts`:
   - `POST /api/colonies` with valid founding params creates a colony row and a turn 0 `colony_turns` snapshot.
   - Turn 0 snapshot has correct `sn`, `ss`, `sl` (all 1.0 if adequately provisioned).
   - `POST /api/colonies` with a `body_id` that already has a colony returns 409 Conflict.
 
-- [ ] **2.2 [HUMAN]** Review red tests.
+- [x] **2.2 [HUMAN]** Review red tests.
 
-- [ ] **2.3 [AI]** Implement `POST /api/colonies`:
+- [x] **2.3 [AI]** Implement `POST /api/colonies`:
   - Re-queries Meridian for the selected body to pull the 8 founding fields.
   - Computes `weather_factor` from star spectral + axial tilt + hydrographics (using `ref_weather_factor_dms`).
   - Computes `phi_min` from axial tilt and tidal locking (same formula as colony_export.py).
   - Creates the `colonies` row.
   - Creates turn 0 `colony_turns` row from founding params (rations, laborers, capital, housing, SL starting value from home TL).
 
-- [ ] **2.4 [AI]** Add `GET /api/colonies/:id` returning full colony record + current turn snapshot.
+- [x] **2.4 [AI]** Add `GET /api/colonies/:id` returning full colony record + current turn snapshot.
 
-- [ ] **2.5 [AI]** Tests pass green.
+- [x] **2.5 [AI]** Tests pass green.
 
-- [ ] **2.6 [AI]** Implement client `ColonyFounder` view (form):
+- [x] **2.6 [AI]** Implement client `ColonyFounder` view (form):
   - World info bar (pre-filled from selection).
   - Fields: colony name, colony TL, colonists' home TL, initial laborer counts (AL/IL/ML/AFL), initial capital by type (AC/IC_light/IC_heavy/IC_construction/MC), power KW, rations, raw materials, housing m³, debt.
   - Submit creates the colony via `POST /api/colonies`.
 
-- [ ] **2.7 [AI]** Implement client `ColonyStatus` panel (left panel):
+- [x] **2.7 [AI]** Implement client `ColonyStatus` panel (left panel):
   - Current month, TL, total population (laborers × 4).
   - Laborers by sector.
   - Capital by type.
@@ -105,9 +105,9 @@ Working-style rules: [PROCEDURE.md](../../PROCEDURE.md).
   - Satisfaction indices (SN / SS / SL) with colour coding (red < 1.0, amber near 1.0, green > 1.0).
   - Political track level.
 
-- [ ] **2.8 [UI]** Player selects a world, fills founding form, submits. Colony status panel shows turn 0 state. All values match what was entered.
+- [x] **2.8 [UI]** Player selects a world, fills founding form, submits. Colony status panel shows turn 0 state. All values match what was entered.
 
-- [ ] **2.9 [HUMAN]** Approve commit *(double-approval gate)*: `green: colony founding — POST /api/colonies, founding form, status panel`.
+- [x] **2.9 [HUMAN]** Approve commit *(double-approval gate)*: `green: colony founding — POST /api/colonies, founding form, status panel`.
 
 ---
 
