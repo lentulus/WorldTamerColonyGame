@@ -1,4 +1,7 @@
 import { WorldList } from './views/WorldList.js';
+import { ColonyFounder } from './views/ColonyFounder.js';
+import { ColonyStatus } from './views/ColonyStatus.js';
+import { fetchColony } from './api/colonies.js';
 import type { WorldCandidate } from '@worldtamer/shared';
 
 import './style.css';
@@ -7,12 +10,42 @@ const app = document.getElementById('app')!;
 
 function showWorldList() {
   app.innerHTML = '';
-  const view = WorldList((world: WorldCandidate) => {
-    app.innerHTML = `<p>Selected: <strong>${world.system_name} ${world.body_position}</strong> — ${world.world_type} (founding form coming in Slice 2)</p>
-                     <button id="back">← Back to world list</button>`;
-    document.getElementById('back')!.addEventListener('click', showWorldList);
-  });
-  app.appendChild(view);
+  app.appendChild(WorldList(showFounder));
+}
+
+function showFounder(world: WorldCandidate) {
+  app.innerHTML = '';
+  app.appendChild(ColonyFounder(world, showColony, showWorldList));
+}
+
+async function showColony(colonyId: number) {
+  app.innerHTML = '<p class="loading">Loading colony…</p>';
+  try {
+    const { colony, turn } = await fetchColony(colonyId);
+    app.innerHTML = '';
+
+    const layout = document.createElement('div');
+    layout.className = 'colony-layout';
+
+    const left = document.createElement('div');
+    left.className = 'colony-left';
+    left.appendChild(ColonyStatus(colony, turn));
+
+    const centre = document.createElement('div');
+    centre.className = 'colony-centre';
+    centre.innerHTML = `<h3>Turn Log</h3><p class="muted">Colony established — month 0. Advance the first turn to begin.</p>`;
+
+    const right = document.createElement('div');
+    right.className = 'colony-right';
+    right.innerHTML = `<h3>Actions</h3><p class="muted">Turn controls arrive in Slice 3.</p>`;
+
+    layout.appendChild(left);
+    layout.appendChild(centre);
+    layout.appendChild(right);
+    app.appendChild(layout);
+  } catch (err) {
+    app.innerHTML = `<p class="error-msg">${(err as Error).message}</p>`;
+  }
 }
 
 showWorldList();
