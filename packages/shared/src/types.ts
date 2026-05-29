@@ -203,6 +203,19 @@ export interface TurnResolution {
     materials:   { roll: number; dm: number; adjusted: number; multiplier: number };
   };
   active_event_dms: EventEffects;
+
+  // Production quantities computed at turn/start (base output × dice multiplier)
+  q_a: number;
+  q_m: number;
+
+  // Totals available for allocation (produced this turn + previous stockpile)
+  rations_available: number;
+  raw_materials_available: number;
+
+  // Filled in by the allocation endpoints
+  rations_allocation?: RationAllocation;
+  sn?: number;
+  materials_allocation?: MaterialsAllocation;
 }
 
 // ── Allocation requests ───────────────────────────────────────────────────────

@@ -2,8 +2,9 @@ import { WorldList } from './views/WorldList.js';
 import { ColonyFounder } from './views/ColonyFounder.js';
 import { ColonyStatus } from './views/ColonyStatus.js';
 import { TurnLog } from './views/TurnLog.js';
+import { AllocationPanel } from './views/AllocationPanel.js';
 import { fetchColony } from './api/colonies.js';
-import type { WorldCandidate } from '@worldtamer/shared';
+import type { WorldCandidate, TurnResolution, ColonyTurn } from '@worldtamer/shared';
 
 import './style.css';
 
@@ -32,21 +33,39 @@ async function showColony(colonyId: number) {
     left.className = 'colony-left';
     left.appendChild(ColonyStatus(colony, turn));
 
+    const right = document.createElement('div');
+    right.className = 'colony-right';
+
+    // Mutable state shared between TurnLog and AllocationPanel
+    let activeTurn: ColonyTurn = turn;
+    let activeResolution: TurnResolution | null = null;
+
+    function renderRight() {
+      right.innerHTML = '';
+      right.appendChild(AllocationPanel(activeResolution, activeTurn, (_sn) => {
+        // SN updated — refresh left status panel
+        refreshStatus();
+      }));
+    }
+
     async function refreshStatus() {
       try {
         const { colony: c2, turn: t2 } = await fetchColony(colonyId);
+        activeTurn = t2;
         left.innerHTML = '';
         left.appendChild(ColonyStatus(c2, t2));
-      } catch { /* silent — stale display is acceptable */ }
+      } catch { /* silent */ }
     }
 
     const centre = document.createElement('div');
     centre.className = 'colony-centre';
-    centre.appendChild(TurnLog(colonyId, () => { refreshStatus(); }));
+    centre.appendChild(TurnLog(colonyId, (res: TurnResolution) => {
+      activeResolution = res;
+      renderRight();
+      refreshStatus();
+    }));
 
-    const right = document.createElement('div');
-    right.className = 'colony-right';
-    right.innerHTML = `<h3>Actions</h3><p class="muted">Allocation controls arrive in Slice 4.</p>`;
+    renderRight();
 
     layout.appendChild(left);
     layout.appendChild(centre);

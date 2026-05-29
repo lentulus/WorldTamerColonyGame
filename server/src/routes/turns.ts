@@ -6,7 +6,18 @@ import {
   lookupWeatherOutcome,
   lookupPoliticalOutcome,
 } from '../engine/rolls.js';
-import type { TurnResolution, EventEffects } from '@worldtamer/shared';
+import {
+  computeM,
+  computePhiT,
+  computeQA,
+  computeQM,
+  computePowerFactor,
+  computeSN,
+} from '../engine/production.js';
+import type {
+  TurnResolution, EventEffects,
+  RationAllocation, MaterialsAllocation,
+} from '@worldtamer/shared';
 
 const turns = new Hono();
 
@@ -30,7 +41,6 @@ function ssPoliticalDM(ss: number): number {
   return row?.political_dm ?? 0;
 }
 
-// WTH: fully acclimatized (stage 5) = 0 DM; each lower stage is −1.
 function acclimatizationDM(stage: number): number {
   return Math.min(0, stage - 5);
 }
@@ -54,17 +64,19 @@ turns.post('/:id/turn/start', (c) => {
     .get(id) as Record<string, unknown> | undefined;
   if (!colRow) return c.json({ error: 'Colony not found' }, 404);
 
-  const prevTurn = db.prepare(
-    'SELECT sn, ss FROM colony_turns WHERE colony_id = ? ORDER BY month DESC LIMIT 1'
-  ).get(id) as { sn: number; ss: number } | undefined;
+  const prevTurn = db.prepare(`
+    SELECT sn, ss, al, ac, il, ic_light, ic_heavy, ic_construction, ml, mc,
+           power_kw, raw_materials_t, rations, total_laborers, infrastructure_efficiency
+    FROM colony_turns WHERE colony_id = ? ORDER BY month DESC LIMIT 1
+  `).get(id) as Record<string, number> | undefined;
 
-  const snDMValues  = snDMs(prevTurn?.sn ?? 1.0);
-  const ssPolitDM   = ssPoliticalDM(prevTurn?.ss ?? 100);
-  const acclDM      = acclimatizationDM(Number(colRow.acclimatization_stage));
-  const politTrack  = Number(colRow.political_track);
+  const snDMValues   = snDMs(prevTurn?.sn ?? 1.0);
+  const ssPolitDM    = ssPoliticalDM(prevTurn?.ss ?? 100);
+  const acclDM       = acclimatizationDM(Number(colRow.acclimatization_stage));
+  const politTrack   = Number(colRow.political_track);
   const weatherFactor = Number(colRow.weather_factor);
-  const agBonus     = Number(colRow.ag_output_roll_bonus);
-  const newMonth    = Number(colRow.current_month) + 1;
+  const agBonus      = Number(colRow.ag_output_roll_bonus);
+  const newMonth     = Number(colRow.current_month) + 1;
 
   // ── Step 1: Weather ───────────────────────────────────────────────────────
   const weatherRoll     = d20();
@@ -119,7 +131,6 @@ turns.post('/:id/turn/start', (c) => {
     .run(newPolitTrack, id);
 
   // ── Step 2: Output rolls ──────────────────────────────────────────────────
-  // Political DM is sector-scoped by affected_sectors.
   let agPolitDM = 0, indPolitDM = 0, matPolitDM = 0;
   switch (politOutcome.affected_sectors) {
     case 'all':
@@ -133,7 +144,6 @@ turns.post('/:id/turn/start', (c) => {
       else matPolitDM = politOutcome.output_dm;
       break;
     }
-    // 'none': all stay 0
   }
 
   const agRoll = d20();
@@ -150,6 +160,48 @@ turns.post('/:id/turn/start', (c) => {
   const matDM   = applyOutputDMs(-1, matPolitDM, snDMValues.output_dm, acclDM);
   const matAdj  = matRoll + matDM;
   const matMult = lookupOutputMultiplier(matAdj);
+
+  // ── Production computation ────────────────────────────────────────────────
+  const tl = Number(colRow.tech_level);
+
+  const agRef = db.prepare(
+    'SELECT base_output_rations, rm_t_per_month FROM ref_agriculture_tl WHERE tl = ?'
+  ).get(tl) as { base_output_rations: number; rm_t_per_month: number } | undefined
+    ?? { base_output_rations: 0, rm_t_per_month: 0 };
+
+  const indRef = db.prepare(
+    'SELECT kw_per_unit FROM ref_industry_tl WHERE tl = ?'
+  ).get(tl) as { kw_per_unit: number } | undefined ?? { kw_per_unit: 0 };
+
+  const matRef = db.prepare(
+    'SELECT base_output_t_per_month, kw_per_unit FROM ref_materials_tl WHERE tl = ?'
+  ).get(tl) as { base_output_t_per_month: number; kw_per_unit: number } | undefined
+    ?? { base_output_t_per_month: 0, kw_per_unit: 0 };
+
+  const al  = prevTurn?.al  ?? 0;
+  const ac  = prevTurn?.ac  ?? 0;
+  const ml  = prevTurn?.ml  ?? 0;
+  const mc  = prevTurn?.mc  ?? 0;
+  const icTotal = (prevTurn?.ic_light ?? 0) + (prevTurn?.ic_heavy ?? 0) + (prevTurn?.ic_construction ?? 0);
+  const powerKw = prevTurn?.power_kw ?? 0;
+  const rawMat  = prevTurn?.raw_materials_t ?? 0;
+  const rations = prevTurn?.rations ?? 0;
+  const eta     = prevTurn?.infrastructure_efficiency ?? 1.0;
+
+  const powerFactor = computePowerFactor(powerKw, icTotal, mc, indRef.kw_per_unit, matRef.kw_per_unit);
+
+  const M_A = computeM(al, ac);
+  const rmRequired = ac * agRef.rm_t_per_month;
+  const R_A = rmRequired > 0 ? Math.min(1.0, rawMat / rmRequired) : 1.0;
+  const orbitMonths = Math.pow(Number(colRow.orbit_au), 1.5) * 12;
+  const phi = computePhiT(newMonth, orbitMonths, Number(colRow.phi_min));
+  const q_a = computeQA(M_A, agRef.base_output_rations, R_A, phi, eta, powerFactor) * agMult;
+
+  const M_M = computeM(ml, mc);
+  const q_m = computeQM(M_M, matRef.base_output_t_per_month, Number(colRow.rvm), eta, powerFactor) * matMult;
+
+  const rations_available      = q_a + rations;
+  const raw_materials_available = q_m + rawMat;
 
   // ── Build and persist TurnResolution ─────────────────────────────────────
   const resolution: TurnResolution = {
@@ -177,12 +229,95 @@ turns.post('/:id/turn/start', (c) => {
       materials:   { roll: matRoll, dm: matDM, adjusted: matAdj, multiplier: matMult },
     },
     active_event_dms: {},
+    q_a,
+    q_m,
+    rations_available,
+    raw_materials_available,
   };
 
   db.prepare('UPDATE colonies SET active_turn_json = ? WHERE id = ?')
     .run(JSON.stringify(resolution), id);
 
   return c.json(resolution, 200);
+});
+
+// ── POST /api/colonies/:id/turn/allocate-rations ──────────────────────────────
+
+turns.post('/:id/turn/allocate-rations', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) return c.json({ error: 'Invalid id' }, 400);
+
+  const db = getDb();
+  const colRow = db.prepare('SELECT active_turn_json FROM colonies WHERE id = ?')
+    .get(id) as { active_turn_json: string | null } | undefined;
+  if (!colRow) return c.json({ error: 'Colony not found' }, 404);
+  if (!colRow.active_turn_json) return c.json({ error: 'No active turn — call turn/start first' }, 409);
+
+  const resolution = JSON.parse(colRow.active_turn_json) as TurnResolution;
+
+  const prevTurn = db.prepare(
+    'SELECT total_laborers FROM colony_turns WHERE colony_id = ? ORDER BY month DESC LIMIT 1'
+  ).get(id) as { total_laborers: number } | undefined;
+  const totalLaborers = prevTurn?.total_laborers ?? 0;
+
+  const body = await c.req.json() as RationAllocation;
+  const { to_population, to_stockpile, to_export, to_animals } = body;
+  const allocTotal = to_population + to_stockpile + to_export + to_animals;
+
+  if (allocTotal > resolution.rations_available + 0.001) {
+    return c.json({
+      error: `Allocation (${allocTotal.toFixed(1)}) exceeds available rations (${resolution.rations_available.toFixed(1)})`,
+    }, 400);
+  }
+
+  const sn = computeSN(to_population, totalLaborers);
+
+  resolution.rations_allocation = body;
+  resolution.sn = sn;
+  db.prepare('UPDATE colonies SET active_turn_json = ? WHERE id = ?')
+    .run(JSON.stringify(resolution), id);
+
+  return c.json({
+    q_a:               resolution.q_a,
+    rations_available: resolution.rations_available,
+    allocation:        body,
+    sn,
+  }, 200);
+});
+
+// ── POST /api/colonies/:id/turn/allocate-materials ────────────────────────────
+
+turns.post('/:id/turn/allocate-materials', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) return c.json({ error: 'Invalid id' }, 400);
+
+  const db = getDb();
+  const colRow = db.prepare('SELECT active_turn_json FROM colonies WHERE id = ?')
+    .get(id) as { active_turn_json: string | null } | undefined;
+  if (!colRow) return c.json({ error: 'Colony not found' }, 404);
+  if (!colRow.active_turn_json) return c.json({ error: 'No active turn — call turn/start first' }, 409);
+
+  const resolution = JSON.parse(colRow.active_turn_json) as TurnResolution;
+
+  const body = await c.req.json() as MaterialsAllocation;
+  const { to_agriculture, to_industry, to_energy, to_stockpile, to_export } = body;
+  const allocTotal = to_agriculture + to_industry + to_energy + to_stockpile + to_export;
+
+  if (allocTotal > resolution.raw_materials_available + 0.001) {
+    return c.json({
+      error: `Allocation (${allocTotal.toFixed(1)}) exceeds available raw materials (${resolution.raw_materials_available.toFixed(1)})`,
+    }, 400);
+  }
+
+  resolution.materials_allocation = body;
+  db.prepare('UPDATE colonies SET active_turn_json = ? WHERE id = ?')
+    .run(JSON.stringify(resolution), id);
+
+  return c.json({
+    q_m:                       resolution.q_m,
+    raw_materials_available:   resolution.raw_materials_available,
+    allocation:                body,
+  }, 200);
 });
 
 export default turns;
