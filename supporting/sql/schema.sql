@@ -34,7 +34,10 @@ CREATE TABLE IF NOT EXISTS colonies (
 
   -- Infrastructure state
   road_network_cr_spent   REAL    NOT NULL DEFAULT 0,
-  transport_lines         TEXT    NOT NULL DEFAULT '[]'  -- JSON array of TransportLine
+  transport_lines         TEXT    NOT NULL DEFAULT '[]',  -- JSON array of TransportLine
+
+  -- In-progress turn (set by turn/start, cleared by turn/finalize)
+  active_turn_json        TEXT
 );
 
 -- ── Turn snapshots ────────────────────────────────────────────────────────────

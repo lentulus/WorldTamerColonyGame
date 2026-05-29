@@ -26,6 +26,9 @@ export function initColonyDb(path: string): void {
     console.log('[DB] Reference tables seeded.');
   }
 
+  // Idempotent migrations for columns added after initial schema.
+  try { db.exec('ALTER TABLE colonies ADD COLUMN active_turn_json TEXT'); } catch {}
+
   console.log(`[DB] Colony database open at ${path}`);
 }
 

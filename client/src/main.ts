@@ -1,6 +1,7 @@
 import { WorldList } from './views/WorldList.js';
 import { ColonyFounder } from './views/ColonyFounder.js';
 import { ColonyStatus } from './views/ColonyStatus.js';
+import { TurnLog } from './views/TurnLog.js';
 import { fetchColony } from './api/colonies.js';
 import type { WorldCandidate } from '@worldtamer/shared';
 
@@ -31,13 +32,21 @@ async function showColony(colonyId: number) {
     left.className = 'colony-left';
     left.appendChild(ColonyStatus(colony, turn));
 
+    async function refreshStatus() {
+      try {
+        const { colony: c2, turn: t2 } = await fetchColony(colonyId);
+        left.innerHTML = '';
+        left.appendChild(ColonyStatus(c2, t2));
+      } catch { /* silent — stale display is acceptable */ }
+    }
+
     const centre = document.createElement('div');
     centre.className = 'colony-centre';
-    centre.innerHTML = `<h3>Turn Log</h3><p class="muted">Colony established — month 0. Advance the first turn to begin.</p>`;
+    centre.appendChild(TurnLog(colonyId, () => { refreshStatus(); }));
 
     const right = document.createElement('div');
     right.className = 'colony-right';
-    right.innerHTML = `<h3>Actions</h3><p class="muted">Turn controls arrive in Slice 3.</p>`;
+    right.innerHTML = `<h3>Actions</h3><p class="muted">Allocation controls arrive in Slice 4.</p>`;
 
     layout.appendChild(left);
     layout.appendChild(centre);

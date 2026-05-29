@@ -1,4 +1,4 @@
-import type { Colony, ColonyTurn, FoundColonyRequest } from '@worldtamer/shared';
+import type { Colony, ColonyTurn, FoundColonyRequest, TurnResolution } from '@worldtamer/shared';
 
 export async function foundColony(req: FoundColonyRequest): Promise<number> {
   const res = await fetch('/api/colonies', {
@@ -18,5 +18,14 @@ export async function foundColony(req: FoundColonyRequest): Promise<number> {
 export async function fetchColony(id: number): Promise<{ colony: Colony; turn: ColonyTurn }> {
   const res = await fetch(`/api/colonies/${id}`);
   if (!res.ok) throw new Error(`Colony not found (${res.status})`);
+  return res.json();
+}
+
+export async function rollTurn(id: number): Promise<TurnResolution> {
+  const res = await fetch(`/api/colonies/${id}/turn/start`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(err.error ?? `Server error ${res.status}`);
+  }
   return res.json();
 }
