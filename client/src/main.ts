@@ -64,7 +64,7 @@ async function showColony(colonyId: number) {
     function renderRight() {
       right.innerHTML = '';
       right.appendChild(AllocationPanel(
-        activeResolution, activeTurn,
+        colonyId, activeResolution, activeTurn,
         (_sn) => { refreshStatus(); },
         (_ss, _slIndex) => { refreshStatus(); },
         () => {

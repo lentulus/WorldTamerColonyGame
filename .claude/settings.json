@@ -23,7 +23,8 @@
       "Bash(pnpm --filter client exec tsc --noEmit)",
       "Bash(curl -s -X POST http://localhost:3002/api/colonies/1/turn/finalize -H 'Content-Type: application/json' -d '{\"al\":60,\"il\":20,\"ml\":15,\"afl\":5}' -w '\\\\nHTTP %{http_code}')",
       "Bash(curl -s -X POST http://localhost:3002/api/colonies/1/turn/start)",
-      "Bash(curl -s -X POST http://localhost:3002/api/colonies/1/turn/finalize -H 'Content-Type: application/json' -d '{\"al\":200,\"il\":20,\"ml\":15,\"afl\":5}' -w '\\\\nHTTP %{http_code}')"
+      "Bash(curl -s -X POST http://localhost:3002/api/colonies/1/turn/finalize -H 'Content-Type: application/json' -d '{\"al\":200,\"il\":20,\"ml\":15,\"afl\":5}' -w '\\\\nHTTP %{http_code}')",
+      "Bash(pnpm --filter @worldtamer/training test)"
     ]
   }
 }

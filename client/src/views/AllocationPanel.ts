@@ -1,5 +1,6 @@
 import type { TurnResolution, ColonyTurn } from '@worldtamer/shared';
 import { allocateRations, allocateMaterials, allocateIndustrial, finalizeTurn } from '../api/turns.js';
+import { fetchSuggestion } from '../api/colonies.js';
 
 function fmt(n: number, dp = 1): string {
   return n.toLocaleString('en', { maximumFractionDigits: dp });
@@ -13,7 +14,7 @@ function snColour(sn: number): string {
 
 function numInput(id: string, label: string, max: number): string {
   return `
-    <label class="alloc-label" for="${id}">${label}</label>
+    <label class="alloc-label" for="${id}">${label} <span id="${id}-badge" class="suggested-badge" style="display:none">suggested</span></label>
     <input id="${id}" class="alloc-input" type="number" min="0" step="1"
            value="0" data-max="${max}">`;
 }
@@ -353,6 +354,7 @@ function buildLaborSection(
 // ── AllocationPanel ───────────────────────────────────────────────────────────
 
 export function AllocationPanel(
+  colonyId: number,
   resolution: TurnResolution | null,
   turn: ColonyTurn,
   onSnUpdated: (sn: number) => void,
@@ -373,6 +375,78 @@ export function AllocationPanel(
     root.appendChild(p);
     return root;
   }
+
+  // Suggest button — fetches policy suggestion and pre-fills all fields
+  const suggestBtn = document.createElement('button');
+  suggestBtn.className = 'btn-suggest';
+  suggestBtn.textContent = 'Suggest allocations';
+  root.appendChild(suggestBtn);
+
+  // Clear badge when user manually edits a field (isTrusted = false for programmatic events)
+  root.addEventListener('input', (e) => {
+    if (!(e as InputEvent).isTrusted) return;
+    const input = e.target as HTMLInputElement;
+    const badge = root.querySelector<HTMLSpanElement>(`#${input.id}-badge`);
+    if (badge) badge.style.display = 'none';
+  });
+
+  function fill(selector: string, value: number) {
+    const input = root.querySelector<HTMLInputElement>(selector);
+    if (!input) return;
+    input.value = String(value);
+    const badge = root.querySelector<HTMLSpanElement>(`#${input.id}-badge`);
+    if (badge) badge.style.display = '';
+  }
+
+  suggestBtn.addEventListener('click', async () => {
+    suggestBtn.disabled = true;
+    suggestBtn.textContent = 'Loading…';
+    try {
+      const s = await fetchSuggestion(colonyId);
+      const availR = resolution.rations_available;
+      const availM = resolution.raw_materials_available;
+      const qi     = resolution.q_i;
+      const total  = turn.total_laborers;
+
+      fill('#ra-pop', Math.floor(s.rations.to_population_frac * availR));
+      fill('#ra-exp', Math.floor(s.rations.to_export_frac * availR));
+
+      fill('#rm-ag',  Math.floor(s.materials.to_agriculture_frac * availM));
+      fill('#rm-ind', Math.floor(s.materials.to_industry_frac * availM));
+      fill('#rm-exp', Math.floor(s.materials.to_export_frac * availM));
+
+      fill('#in-cap', Math.floor(s.industrial.to_capital_frac * qi));
+      fill('#in-hou', Math.floor(s.industrial.to_housing_frac * qi));
+      fill('#in-cg',  Math.floor(s.industrial.to_consumer_goods_frac * qi));
+      fill('#in-rd',  Math.floor(s.industrial.to_road_frac * qi));
+
+      const al  = Math.floor(s.labour.al_frac * total);
+      const il  = Math.floor(s.labour.il_frac * total);
+      const ml  = Math.floor(s.labour.ml_frac * total);
+      const afl = Math.max(0, total - al - il - ml);
+      fill('#lb-al',  al);
+      fill('#lb-il',  il);
+      fill('#lb-ml',  ml);
+      fill('#lb-afl', afl);
+
+      // Trigger balance-display updates in every section
+      root.querySelectorAll<HTMLInputElement>('.alloc-input').forEach(inp =>
+        inp.dispatchEvent(new Event('input', { bubbles: true }))
+      );
+
+      suggestBtn.textContent = 'Suggest allocations';
+      suggestBtn.disabled = false;
+    } catch (err) {
+      const msg = (err as Error).message === '503'
+        ? 'No trained policy'
+        : 'Suggestion failed';
+      suggestBtn.textContent = msg;
+      setTimeout(() => {
+        suggestBtn.textContent = 'Suggest allocations';
+        suggestBtn.disabled = false;
+      }, 3000);
+    }
+  });
 
   root.appendChild(buildRationsSection(resolution, turn, onSnUpdated));
   root.appendChild(buildMaterialsSection(resolution, turn));

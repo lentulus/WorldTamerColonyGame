@@ -68,6 +68,22 @@ importers:
         specifier: ^4.1.7
         version: 4.1.7(@types/node@22.19.19)(@vitest/coverage-v8@4.1.7)(vite@6.4.2(@types/node@22.19.19)(tsx@4.22.3))
 
+  training:
+    dependencies:
+      '@worldtamer/shared':
+        specifier: workspace:*
+        version: link:../packages/shared
+    devDependencies:
+      tsx:
+        specifier: ^4.19.4
+        version: 4.22.3
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.7
+        version: 4.1.7(@types/node@22.19.19)(@vitest/coverage-v8@4.1.7)(vite@6.4.2(@types/node@22.19.19)(tsx@4.22.3))
+
 packages:
 
   '@babel/helper-string-parser@7.29.7':

@@ -21,6 +21,20 @@ export async function fetchColony(id: number): Promise<{ colony: Colony; turn: C
   return res.json();
 }
 
+export interface SuggestionResponse {
+  rations:    { to_population_frac: number; to_export_frac: number };
+  materials:  { to_agriculture_frac: number; to_industry_frac: number; to_export_frac: number };
+  industrial: { to_capital_frac: number; to_housing_frac: number; to_consumer_goods_frac: number; to_road_frac: number };
+  labour:     { al_frac: number; il_frac: number; ml_frac: number };
+}
+
+export async function fetchSuggestion(id: number): Promise<SuggestionResponse> {
+  const res = await fetch(`/api/colonies/${id}/suggest`);
+  if (res.status === 503) throw new Error('503');
+  if (!res.ok) throw new Error(`Server error ${res.status}`);
+  return res.json();
+}
+
 export async function rollTurn(id: number): Promise<TurnResolution> {
   const res = await fetch(`/api/colonies/${id}/turn/start`, { method: 'POST' });
   if (!res.ok) {
