@@ -115,19 +115,19 @@ Working-style rules: [PROCEDURE.md](../../PROCEDURE.md).
 
 **Goal:** Player presses "Roll Turn". Server rolls all dice for the month, resolves weather and political events, displays results in the turn log. No allocation yet — player observes.
 
-- [ ] **3.1 [AI]** Write red math tests in `server/src/engine/rolls.test.ts`:
+- [x] **3.1 [AI]** Write red math tests in `server/src/engine/rolls.test.ts`:
   - `lookupOutputMultiplier(roll)`: D20=1→0.80, D20=8→1.00, D20=20→1.20, boundary values.
   - `applyOutputDMs(baseDM, politicalDM, eventDM, acclimatizationDM)`: clamped to table bounds.
   - `lookupWeatherOutcome(adjustedRoll)`: correct outcome for each band.
   - `lookupPoliticalOutcome(adjustedRoll)`: correct event label and track movement for each band.
 
-- [ ] **3.2 [HUMAN]** Review red tests.
+- [x] **3.2 [HUMAN]** Review red tests.
 
-- [ ] **3.3 [AI]** Implement pure functions in `server/src/engine/rolls.ts`: `lookupOutputMultiplier()`, `applyOutputDMs()`, `lookupWeatherOutcome()`, `lookupPoliticalOutcome()`. All read from seeded reference tables — no hardcoded values.
+- [x] **3.3 [AI]** Implement pure functions in `server/src/engine/rolls.ts`: `lookupOutputMultiplier()`, `applyOutputDMs()`, `lookupWeatherOutcome()`, `lookupPoliticalOutcome()`. All read from seeded reference tables — no hardcoded values.
 
-- [ ] **3.4 [AI]** Tests pass green.
+- [x] **3.4 [AI]** Tests pass green.
 
-- [ ] **3.5 [AI]** Implement `POST /api/colonies/:id/turn/start`:
+- [x] **3.5 [AI]** Implement `POST /api/colonies/:id/turn/start`:
   - Rolls D20 for: weather, random event trigger (≥16 triggers second roll), political, agriculture, industry, materials.
   - Applies all accumulated DMs (satisfaction DMs from previous turn, political track DM, acclimatization DM, controlled economy −1).
   - Resolves weather outcome; if storm, records damage in `colony_events`.
@@ -135,14 +135,14 @@ Working-style rules: [PROCEDURE.md](../../PROCEDURE.md).
   - Stores partial turn state (pending allocations) — does NOT write the `colony_turns` row yet.
   - Returns `TurnResolution` with all roll results, outcomes, and DMs shown.
 
-- [ ] **3.6 [AI]** Implement client `TurnLog` panel (centre panel):
+- [x] **3.6 [AI]** Implement client `TurnLog` panel (centre panel):
   - Step-by-step display of what happened.
   - Each step shows: roll value, DMs applied, final result, outcome text.
   - "Roll Turn" button at top.
 
-- [ ] **3.7 [UI]** Player presses "Roll Turn". Centre panel shows all dice results with DMs and outcomes. Weather and political events are described in plain language.
+- [x] **3.7 [UI]** Player presses "Roll Turn". Centre panel shows all dice results with DMs and outcomes. Weather and political events are described in plain language.
 
-- [ ] **3.8 [HUMAN]** Approve commit *(double-approval gate)*: `green: turn resolution — dice rolls, weather/political events, turn log panel`.
+- [x] **3.8 [HUMAN]** Approve commit *(double-approval gate)*: `green: turn resolution — dice rolls, weather/political events, turn log panel`.
 
 ---
 

@@ -8,12 +8,12 @@ and where to find the authoritative details.
 
 ## TL;DR for a fresh session
 
-**Slices 0–2 complete. Next action: begin Slice 3 (turn resolution — dice rolls, weather, political events).**
+**Slices 0–3 complete. Next action: begin Slice 4 (rations + raw materials allocation, SN).**
 
 First actions in a new session:
 1. Read this file.
 2. `git log --oneline -6` and `git status` — confirm current state.
-3. Open [ColonySimChecklist.md](supporting/docs/ColonySimChecklist.md) and find the first unchecked step (currently **3.1**).
+3. Open [ColonySimChecklist.md](supporting/docs/ColonySimChecklist.md) and find the first unchecked step (currently **4.1**).
 4. Read [ColonySimDesign.md](supporting/docs/ColonySimDesign.md) for architecture decisions before writing any code.
 5. Apply the double-approval gate before doing anything irreversible.
 
@@ -72,23 +72,27 @@ WorldTamer/
 │   ├── main.ts                      Startup: initColonyDb() then buildApp() on port 3002
 │   ├── config.ts                    MERIDIAN_DATA, COLONY_DB, PORT from .env
 │   ├── db/
-│   │   ├── colony.ts                SQLite init (schema.sql + seed.sql on first run)
+│   │   ├── colony.ts                SQLite init (schema.sql + seed.sql + ALTER TABLE migrations)
 │   │   ├── colonies.ts              CRUD: createColony(), getColony(), getSlBaseline()
 │   │   └── meridian.ts              DuckDB: getHabitableWorlds(), getWorldById()
 │   ├── engine/
-│   │   └── founding.ts              Pure: computeWeatherFactor(), computePhiMin()
+│   │   ├── founding.ts              Pure: computeWeatherFactor(), computePhiMin()
+│   │   └── rolls.ts                 lookupOutputMultiplier(), applyOutputDMs(),
+│   │                                lookupWeatherOutcome(), lookupPoliticalOutcome()
 │   └── routes/
 │       ├── worlds.ts                GET /api/worlds
-│       └── colonies.ts              POST /api/colonies, GET /api/colonies/:id
+│       ├── colonies.ts              POST /api/colonies, GET /api/colonies/:id
+│       └── turns.ts                 POST /api/colonies/:id/turn/start
 ├── client/src/
 │   ├── main.ts                      Hash-style router: WorldList → ColonyFounder → colony view
 │   ├── api/
 │   │   ├── worlds.ts                fetchWorlds()
-│   │   └── colonies.ts              foundColony(), fetchColony()
+│   │   └── colonies.ts              foundColony(), fetchColony(), rollTurn()
 │   ├── views/
 │   │   ├── WorldList.ts             Filterable world table (distance + habitability filters)
 │   │   ├── ColonyFounder.ts         Founding form
-│   │   └── ColonyStatus.ts          Left-panel status display (all colony state, SN/SS/SL coloured)
+│   │   ├── ColonyStatus.ts          Left-panel status display (all colony state, SN/SS/SL coloured)
+│   │   └── TurnLog.ts               Centre-panel: Roll Turn button + step-by-step results
 │   └── style.css                    Global CSS (dark theme)
 └── supporting/
     ├── docs/
@@ -100,7 +104,7 @@ WorldTamer/
         └── seed.sql                 WTH reference data (all ref_* tables, TL 0–15)
 ```
 
-**Test count: 37 green** (15 math + 11 Meridian + 9 HTTP colonies + 2 HTTP worlds).
+**Test count: 70 green** (32 rolls + 15 math + 11 Meridian + 9 HTTP colonies + 2 HTTP worlds + 1 clamping).
 `pnpm test` from root runs all workspaces.
 
 ---
@@ -132,16 +136,16 @@ WorldTamer/
 | 0 | Scaffold, schema, reference data | **Done** `690d54e` |
 | 1 | World selection from Meridian | **Done** `e313c9a` |
 | 2 | Colony founding, turn 0 snapshot | **Done** `c324558` |
-| **3** | **Turn resolution: dice, weather, political events, output rolls** | **Next** |
-| 4 | Rations + raw materials allocation, SN | Not started |
+| 3 | Turn resolution: dice, weather, political events, output rolls | **Done** `a5fb4c2` |
+| **4** | **Rations + raw materials allocation, SN** | **Next** |
 | 5 | Industrial allocation, SS/SL, political track | Not started |
 | 6 | Labor reassignment, capital, maintenance, finalization | Not started |
 | 7 | Weather damage, random events, acclimatization | Not started |
 | 8 | Infrastructure | Not started |
 | 9 | Smoke test + sign-off | Not started |
 
-**First step of Slice 3 is 3.1** — write red math tests for `lookupOutputMultiplier()`,
-`applyOutputDMs()`, `lookupWeatherOutcome()`, and `lookupPoliticalOutcome()`.
+**First step of Slice 4 is 4.1** — write red math tests for `computeM()`, `computePhiT()`,
+`computeQA()`, and `computeSN()` in `server/src/engine/production.test.ts`.
 
 ---
 
