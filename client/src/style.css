@@ -263,3 +263,6 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 /* Turn log note row (ongoing event DMs) */
 .turn-row--note { font-size: 0.82em; color: var(--color-accent); margin-bottom: 0.25rem; }
+
+/* Infrastructure warning in status panel */
+.infra-warning { font-size: 0.80em; color: var(--color-warn); margin-top: 0.2rem; }

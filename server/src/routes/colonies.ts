@@ -3,6 +3,11 @@ import { getWorldById } from '../db/meridian.js';
 import { createColony, getColony, ColonyConflictError } from '../db/colonies.js';
 import { getDb } from '../db/colony.js';
 import { computeWeatherFactor, computePhiMin } from '../engine/founding.js';
+import {
+  computeRoadNetworkStatus,
+  computeTransportCapacity,
+  computeTransportDemand,
+} from '../engine/infrastructure.js';
 import type { FoundColonyRequest } from '@worldtamer/shared';
 
 const colonies = new Hono();
@@ -66,7 +71,25 @@ colonies.get('/:id', (c) => {
     ORDER BY active_until_month ASC
   `).all(id, currentMonth) as Array<{ event_type: string; description: string; active_until_month: number }>;
 
-  return c.json({ ...data, recent_turns: recentRows, active_events: activeEvents });
+  // Infrastructure status
+  const agRef = getDb().prepare('SELECT land_km2_per_al FROM ref_agriculture_tl WHERE tl = ?')
+    .get(data.colony.tech_level) as { land_km2_per_al: number } | undefined
+    ?? { land_km2_per_al: 0 };
+  const inhabited_km2   = data.turn.al * agRef.land_km2_per_al;
+  const road_status     = computeRoadNetworkStatus(
+    inhabited_km2, data.colony.road_network_cr_spent, data.colony.tech_level,
+  );
+  const transport_capacity = computeTransportCapacity(data.colony.transport_lines);
+  const transport_demand   = computeTransportDemand(data.turn.raw_materials_t, data.turn.total_laborers);
+
+  return c.json({
+    ...data,
+    recent_turns: recentRows,
+    active_events: activeEvents,
+    road_status,
+    transport_capacity,
+    transport_demand,
+  });
 });
 
 export default colonies;

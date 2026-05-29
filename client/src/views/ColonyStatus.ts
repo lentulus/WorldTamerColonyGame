@@ -1,6 +1,7 @@
 import type { Colony, ColonyTurn } from '@worldtamer/shared';
 
 type ActiveEvent = { event_type: string; description: string; active_until_month: number };
+type RoadStatus  = { required_cr: number; spent_cr: number; complete: boolean } | null;
 
 const PT_LABELS: Record<number, string> = {
   3: 'Excellent', 2: 'Very Good', 1: 'Good', 0: 'Fair',
@@ -40,6 +41,9 @@ export function ColonyStatus(
   turn: ColonyTurn,
   recentTurns: RecentTurn[] = [],
   activeEvents: ActiveEvent[] = [],
+  roadStatus: RoadStatus = null,
+  transportCapacity = 0,
+  transportDemand = 0,
 ): HTMLElement {
   const root = document.createElement('div');
   root.className = 'status-panel';
@@ -119,6 +123,27 @@ export function ColonyStatus(
         </div>`;
       }).join('')}
     </div>` : ''}
+    ${roadStatus ? (() => {
+      const pct = roadStatus.required_cr > 0
+        ? Math.min(100, Math.round(roadStatus.spent_cr / roadStatus.required_cr * 100))
+        : 100;
+      const shortfall = Math.max(0, roadStatus.required_cr - roadStatus.spent_cr);
+      const roadLine = roadStatus.complete
+        ? `<span style="color:#4caf50">Complete</span>`
+        : `${pct}% &nbsp;·&nbsp; <span style="color:var(--color-warn)">${fmt(shortfall)} Cr needed</span>`;
+      const transLine = transportCapacity === 0
+        ? `<span class="muted">No lines installed</span>`
+        : transportDemand <= transportCapacity
+          ? `<span style="color:#4caf50">${transportCapacity.toFixed(1)} cap / ${transportDemand.toFixed(1)} demand</span>`
+          : `<span style="color:var(--color-warn)">${transportCapacity.toFixed(1)} cap / ${transportDemand.toFixed(1)} demand — OVERLOADED</span>`;
+      return `
+    <div class="status-section">
+      <div class="status-label">Infrastructure</div>
+      <div class="status-row"><span>Road network</span><span>${roadLine}</span></div>
+      <div class="status-row"><span>Transport</span><span>${transLine}</span></div>
+      ${!roadStatus.complete ? `<div class="infra-warning">60% output penalty — roads incomplete</div>` : ''}
+    </div>`;
+    })() : ''}
     ${recentTurns.length > 0 ? `
     <div class="status-section">
       <div class="status-label">Turn history</div>

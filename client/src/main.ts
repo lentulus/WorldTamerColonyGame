@@ -28,6 +28,9 @@ async function showColony(colonyId: number) {
     const turn: ColonyTurn = data.turn;
     const recentTurns = data.recent_turns ?? [];
     const activeEvents = data.active_events ?? [];
+    const roadStatus = data.road_status ?? null;
+    const transportCapacity = data.transport_capacity ?? 0;
+    const transportDemand = data.transport_demand ?? 0;
     app.innerHTML = '';
 
     const layout = document.createElement('div');
@@ -35,7 +38,7 @@ async function showColony(colonyId: number) {
 
     const left = document.createElement('div');
     left.className = 'colony-left';
-    left.appendChild(ColonyStatus(colony, turn, recentTurns, activeEvents));
+    left.appendChild(ColonyStatus(colony, turn, recentTurns, activeEvents, roadStatus, transportCapacity, transportDemand));
 
     const centre = document.createElement('div');
     centre.className = 'colony-centre';
@@ -51,7 +54,10 @@ async function showColony(colonyId: number) {
         const d = await fetchColony(colonyId) as any;
         activeTurn = d.turn;
         left.innerHTML = '';
-        left.appendChild(ColonyStatus(d.colony, d.turn, d.recent_turns ?? [], d.active_events ?? []));
+        left.appendChild(ColonyStatus(
+          d.colony, d.turn, d.recent_turns ?? [], d.active_events ?? [],
+          d.road_status ?? null, d.transport_capacity ?? 0, d.transport_demand ?? 0,
+        ));
       } catch { /* silent */ }
     }
 

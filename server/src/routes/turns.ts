@@ -22,8 +22,12 @@ import {
 import {
   computeMaintenanceCost,
   computeInfrastructureEfficiency,
-  computeRoadRequirement,
 } from '../engine/maintenance.js';
+import {
+  computeRoadNetworkStatus,
+  computeTransportCapacity,
+  computeTransportDemand,
+} from '../engine/infrastructure.js';
 import {
   applyActiveEvents,
   resolveWeatherDamage,
@@ -455,8 +459,9 @@ turns.post('/:id/turn/finalize', async (c) => {
   const colonyAge = newMonth; // months since founding (founded_month = 0)
 
   // ── Reference data ────────────────────────────────────────────────────────
-  const agRef  = db.prepare('SELECT ac_cost_cr FROM ref_agriculture_tl WHERE tl = ?')
-    .get(tl) as { ac_cost_cr: number } | undefined ?? { ac_cost_cr: 0 };
+  const agRef  = db.prepare('SELECT ac_cost_cr, land_km2_per_al FROM ref_agriculture_tl WHERE tl = ?')
+    .get(tl) as { ac_cost_cr: number; land_km2_per_al: number } | undefined
+    ?? { ac_cost_cr: 0, land_km2_per_al: 0 };
   const indRef = db.prepare('SELECT light_ic_cost_cr, heavy_ic_cost_cr, construction_ic_cost_cr FROM ref_industry_tl WHERE tl = ?')
     .get(tl) as { light_ic_cost_cr: number; heavy_ic_cost_cr: number; construction_ic_cost_cr: number }
     | undefined ?? { light_ic_cost_cr: 0, heavy_ic_cost_cr: 0, construction_ic_cost_cr: 0 };
@@ -535,12 +540,15 @@ turns.post('/:id/turn/finalize', async (c) => {
   const new_debt = (prevTurn?.debt_cr ?? 0) + maintenance_cost_cr - 0; // no revenue yet
 
   // ── Infrastructure efficiency ─────────────────────────────────────────────
-  const requiredKm = computeRoadRequirement(1);
-  const required_cr = requiredKm * transRef.cost_mcr_per_km * 1_000_000;
-  const roads_complete = required_cr > 0
-    ? Number(colRow.road_network_cr_spent) >= required_cr
-    : true;
-  const infrastructure_efficiency = computeInfrastructureEfficiency(roads_complete);
+  const inhabited_km2 = al * agRef.land_km2_per_al;
+  const roadCredits   = resolution.industrial_allocation?.to_road_network_cr ?? 0;
+  const newRoadSpent  = Number(colRow.road_network_cr_spent) + roadCredits;
+  const roadStatus    = computeRoadNetworkStatus(inhabited_km2, newRoadSpent, tl);
+  const infrastructure_efficiency = computeInfrastructureEfficiency(roadStatus.complete);
+
+  const transportLines   = JSON.parse(String(colRow.transport_lines ?? '[]'));
+  const transport_capacity = computeTransportCapacity(transportLines);
+  const transport_demand   = computeTransportDemand(new_rm, newTotal);
 
   // ── Political state ───────────────────────────────────────────────────────
   const political_track = Number(colRow.political_track);
@@ -589,8 +597,12 @@ turns.post('/:id/turn/finalize', async (c) => {
   );
 
   // ── Advance colony record ─────────────────────────────────────────────────
-  db.prepare('UPDATE colonies SET current_month = ?, active_turn_json = NULL WHERE id = ?')
-    .run(newMonth, id);
+  db.prepare(`
+    UPDATE colonies
+    SET current_month = ?, active_turn_json = NULL,
+        road_network_cr_spent = road_network_cr_spent + ?
+    WHERE id = ?
+  `).run(newMonth, roadCredits, id);
 
   // Return the completed turn snapshot
   const newTurnRow = db.prepare(
@@ -622,7 +634,13 @@ turns.post('/:id/turn/finalize', async (c) => {
     maintenance_cost_cr: Number(newTurnRow.maintenance_cost_cr),
   };
 
-  return c.json({ month: newMonth, turn }, 200);
+  return c.json({
+    month: newMonth,
+    turn,
+    road_status: roadStatus,
+    transport_capacity,
+    transport_demand,
+  }, 200);
 });
 
 export default turns;

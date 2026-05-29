@@ -8,12 +8,12 @@ and where to find the authoritative details.
 
 ## TL;DR for a fresh session
 
-**Slices 0–7 complete. Next action: begin Slice 8 (infrastructure — road network, transport capacity).**
+**Slices 0–8 complete. Next action: begin Slice 9 (smoke test + sign-off).**
 
 First actions in a new session:
 1. Read this file.
 2. `git log --oneline -6` and `git status` — confirm current state.
-3. Open [ColonySimChecklist.md](supporting/docs/ColonySimChecklist.md) and find the first unchecked step (currently **8.1**).
+3. Open [ColonySimChecklist.md](supporting/docs/ColonySimChecklist.md) and find the first unchecked step (currently **9.1**).
 4. Read [ColonySimDesign.md](supporting/docs/ColonySimDesign.md) for architecture decisions before writing any code.
 5. Apply the double-approval gate before doing anything irreversible.
 
@@ -104,7 +104,7 @@ WorldTamer/
         └── seed.sql                 WTH reference data (all ref_* tables, TL 0–15)
 ```
 
-**Test count: 164 green** (32 rolls + 53 production + 18 maintenance + 15 founding + 23 events + 11 Meridian + 9 HTTP colonies + 2 HTTP worlds + 1 clamping).
+**Test count: 180 green** (32 rolls + 53 production + 18 maintenance + 16 infrastructure + 15 founding + 23 events + 11 Meridian + 9 HTTP colonies + 2 HTTP worlds + 1 clamping).
 `pnpm test` from root runs all workspaces (shared and client pass with no test files).
 
 ---
@@ -140,13 +140,12 @@ WorldTamer/
 | 4 | Rations + raw materials allocation, SN | **Done** `92446a4` |
 | 5 | Industrial allocation, SS/SL, political track | **Done** `38ee14d` |
 | 6 | Labor reassignment, capital, maintenance, finalization | **Done** `2e2f917` |
-| 7 | Weather damage, random events, acclimatization | **Done** *(this commit)* |
-| **8** | **Infrastructure** | **Next** |
-| 9 | Smoke test + sign-off | Not started |
+| 7 | Weather damage, random events, acclimatization | **Done** `1fc0a7d` |
+| 8 | Infrastructure | **Done** *(this commit)* |
+| **9** | **Smoke test + sign-off** | **Next** |
 
-**First step of Slice 8 is 8.1** — write red tests for `computeRoadNetworkStatus()`,
-`computeTransportCapacity()`, and `computeTransportDemand()` in
-`server/src/engine/infrastructure.test.ts`.
+**First step of Slice 9 is 9.1** — run `pnpm test` from root; all 180 tests must be green.
+Then scripted API verification of a full 12-month run, then player browser sign-off.
 
 ---
 

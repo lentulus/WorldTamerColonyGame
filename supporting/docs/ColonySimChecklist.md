@@ -292,28 +292,28 @@ Working-style rules: [PROCEDURE.md](../../PROCEDURE.md).
 
 **Goal:** Road network completion is tracked. Transport line capacity is checked each turn. Both show warnings when insufficient.
 
-- [ ] **8.1 [AI]** Write red tests:
+- [x] **8.1 [AI]** Write red tests:
   - `computeRoadNetworkStatus(inhabited_km2, construction_credits_spent, tl)`: returns `{required_cr, spent_cr, complete: boolean}`.
   - `computeTransportCapacity(installed_lines)`: total capacity in million-tonne-km/month.
   - `computeTransportDemand(raw_materials_t, total_laborers)`: demand in million-tonne-km/month.
 
-- [ ] **8.2 [HUMAN]** Review red tests.
+- [x] **8.2 [HUMAN]** Review red tests.
 
-- [ ] **8.3 [AI]** Implement `server/src/engine/infrastructure.ts`: `computeRoadNetworkStatus()`, `computeTransportCapacity()`, `computeTransportDemand()`.
+- [x] **8.3 [AI]** Implement `server/src/engine/infrastructure.ts`: `computeRoadNetworkStatus()`, `computeTransportCapacity()`, `computeTransportDemand()`.
 
-- [ ] **8.4 [AI]** Tests pass green.
+- [x] **8.4 [AI]** Tests pass green.
 
-- [ ] **8.5 [AI]** Store infrastructure state in `colonies`: `road_network_cr_spent`, `transport_lines` (JSON array of installed lines).
+- [x] **8.5 [AI]** Store infrastructure state in `colonies`: `road_network_cr_spent`, `transport_lines` (JSON array of installed lines). Both columns already in schema; `road_network_cr_spent` now updated in finalize.
 
-- [ ] **8.6 [AI]** Wire into turn finalization: if roads incomplete, apply 60% efficiency factor to all non-construction output. Log the penalty in the turn record.
+- [x] **8.6 [AI]** Wire into turn finalization: if roads incomplete, apply 60% efficiency factor to all non-construction output. Log the penalty in the turn record.
 
-- [ ] **8.7 [AI]** Wire into industrial allocation: player can direct construction output toward road network or transport lines. Server converts credits to completion progress.
+- [x] **8.7 [AI]** Wire into industrial allocation: player can direct construction output toward road network or transport lines. Server converts credits to completion progress.
 
-- [ ] **8.8 [AI]** Show infrastructure status in colony status panel: road network (% complete, credit shortfall); transport lines (installed capacity vs. demand).
+- [x] **8.8 [AI]** Show infrastructure status in colony status panel: road network (% complete, credit shortfall); transport lines (installed capacity vs. demand).
 
-- [ ] **8.9 [UI]** Player sees infrastructure warnings. Can fund road construction via the industrial allocation panel. 60% penalty is visible in the turn log when roads are incomplete.
+- [x] **8.9 [UI]** Player sees infrastructure warnings. Can fund road construction via the industrial allocation panel. 60% penalty is visible in the turn log when roads are incomplete.
 
-- [ ] **8.10 [HUMAN]** Approve commit *(double-approval gate)*: `green: infrastructure — road network, transport capacity, efficiency penalty`.
+- [x] **8.10 [HUMAN]** Approve commit *(double-approval gate)*: `green: infrastructure — road network, transport capacity, efficiency penalty`.
 
 ---
 
