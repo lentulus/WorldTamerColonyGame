@@ -27,7 +27,9 @@ function fmt(n: number, dp = 0): string {
   return n.toLocaleString('en', { maximumFractionDigits: dp });
 }
 
-export function ColonyStatus(colony: Colony, turn: ColonyTurn): HTMLElement {
+type RecentTurn = { month: number; sn: number; ss: number; sl: number; political_track: number };
+
+export function ColonyStatus(colony: Colony, turn: ColonyTurn, recentTurns: RecentTurn[] = []): HTMLElement {
   const root = document.createElement('div');
   root.className = 'status-panel';
 
@@ -91,7 +93,18 @@ export function ColonyStatus(colony: Colony, turn: ColonyTurn): HTMLElement {
       <div class="status-label">Politics</div>
       <div class="status-row"><span>Political track</span><span>${ptLabel} (${turn.political_track >= 0 ? '+' : ''}${turn.political_track})</span></div>
       <div class="status-row"><span>Acclimatization</span><span>Stage ${colony.acclimatization_stage}/5</span></div>
-    </div>`;
+    </div>
+    ${recentTurns.length > 0 ? `
+    <div class="status-section">
+      <div class="status-label">Turn history</div>
+      ${recentTurns.map(t => `
+        <div class="status-row history-row">
+          <span>M${t.month}</span>
+          <span style="color:${snColour(t.sn)}">${t.sn.toFixed(2)}</span>
+          <span style="color:${slColour(t.sl)}">${t.sl.toFixed(2)}</span>
+          <span>${t.political_track >= 0 ? '+' : ''}${t.political_track}</span>
+        </div>`).join('')}
+    </div>` : ''}`;
 
   return root;
 }

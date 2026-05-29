@@ -1,5 +1,5 @@
 import type { TurnResolution, ColonyTurn } from '@worldtamer/shared';
-import { allocateRations, allocateMaterials, allocateIndustrial } from '../api/turns.js';
+import { allocateRations, allocateMaterials, allocateIndustrial, finalizeTurn } from '../api/turns.js';
 
 function fmt(n: number, dp = 1): string {
   return n.toLocaleString('en', { maximumFractionDigits: dp });
@@ -277,6 +277,79 @@ function buildIndustrialSection(
   return section;
 }
 
+// ── Labor reassignment + Advance Turn ────────────────────────────────────────
+
+function buildLaborSection(
+  resolution: TurnResolution,
+  turn: ColonyTurn,
+  onFinalized: () => void,
+): HTMLElement {
+  const section = document.createElement('div');
+  section.className = 'alloc-section';
+
+  section.innerHTML = `
+    <div class="alloc-header">Labour (next month)</div>
+    <div class="alloc-fields">
+      ${numInput('lb-al',  'Agriculture', turn.total_laborers)}
+      ${numInput('lb-il',  'Industry',    turn.total_laborers)}
+      ${numInput('lb-ml',  'Materials',   turn.total_laborers)}
+      ${numInput('lb-afl', 'Armed Forces',turn.total_laborers)}
+    </div>
+    <div class="alloc-balance">
+      Unassigned: <span id="lb-remaining">${fmt(turn.total_laborers, 0)}</span>
+    </div>
+    <div id="lb-error" class="error-msg" style="display:none"></div>
+    <button id="lb-advance" class="btn-advance">Advance Turn</button>
+  `;
+
+  // Pre-fill current values
+  (section.querySelector<HTMLInputElement>('#lb-al')!).value  = String(turn.al);
+  (section.querySelector<HTMLInputElement>('#lb-il')!).value  = String(turn.il);
+  (section.querySelector<HTMLInputElement>('#lb-ml')!).value  = String(turn.ml);
+  (section.querySelector<HTMLInputElement>('#lb-afl')!).value = String(turn.afl);
+
+  const remEl    = section.querySelector<HTMLSpanElement>('#lb-remaining')!;
+  const errEl    = section.querySelector<HTMLDivElement>('#lb-error')!;
+  const advBtn   = section.querySelector<HTMLButtonElement>('#lb-advance')!;
+
+  function updateBalance() {
+    const a = Number(section.querySelector<HTMLInputElement>('#lb-al')!.value)  || 0;
+    const i = Number(section.querySelector<HTMLInputElement>('#lb-il')!.value)  || 0;
+    const m = Number(section.querySelector<HTMLInputElement>('#lb-ml')!.value)  || 0;
+    const f = Number(section.querySelector<HTMLInputElement>('#lb-afl')!.value) || 0;
+    const rem = turn.total_laborers - a - i - m - f;
+    remEl.textContent = fmt(rem, 0);
+    remEl.style.color = rem < 0 ? 'var(--color-warn)' : '';
+  }
+
+  section.querySelectorAll<HTMLInputElement>('.alloc-input')
+    .forEach(inp => inp.addEventListener('input', updateBalance));
+  updateBalance();
+
+  advBtn.addEventListener('click', async () => {
+    errEl.style.display = 'none';
+    const al  = Number(section.querySelector<HTMLInputElement>('#lb-al')!.value)  || 0;
+    const il  = Number(section.querySelector<HTMLInputElement>('#lb-il')!.value)  || 0;
+    const ml  = Number(section.querySelector<HTMLInputElement>('#lb-ml')!.value)  || 0;
+    const afl = Number(section.querySelector<HTMLInputElement>('#lb-afl')!.value) || 0;
+
+    advBtn.disabled = true;
+    advBtn.textContent = 'Finalizing…';
+    try {
+      await finalizeTurn(resolution.colony_id, { al, il, ml, afl });
+      advBtn.textContent = 'Turn advanced';
+      onFinalized();
+    } catch (err) {
+      errEl.textContent = (err as Error).message;
+      errEl.style.display = 'block';
+      advBtn.disabled = false;
+      advBtn.textContent = 'Advance Turn';
+    }
+  });
+
+  return section;
+}
+
 // ── AllocationPanel ───────────────────────────────────────────────────────────
 
 export function AllocationPanel(
@@ -284,6 +357,7 @@ export function AllocationPanel(
   turn: ColonyTurn,
   onSnUpdated: (sn: number) => void,
   onIndustrialAllocated?: (ss: number, slIndex: number) => void,
+  onTurnFinalized?: () => void,
 ): HTMLElement {
   const root = document.createElement('div');
   root.className = 'alloc-panel';
@@ -305,13 +379,9 @@ export function AllocationPanel(
   root.appendChild(buildIndustrialSection(resolution, (ss, slIndex) => {
     onIndustrialAllocated?.(ss, slIndex);
   }));
-
-  const future = document.createElement('p');
-  future.className = 'muted';
-  future.style.marginTop = '0.75rem';
-  future.style.fontSize = '0.8em';
-  future.textContent = 'Labour reassignment and turn finalization arrive in Slice 6.';
-  root.appendChild(future);
+  root.appendChild(buildLaborSection(resolution, turn, () => {
+    onTurnFinalized?.();
+  }));
 
   return root;
 }

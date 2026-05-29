@@ -23,7 +23,10 @@ function showFounder(world: WorldCandidate) {
 async function showColony(colonyId: number) {
   app.innerHTML = '<p class="loading">Loading colony…</p>';
   try {
-    const { colony, turn } = await fetchColony(colonyId);
+    const data = await fetchColony(colonyId) as any;
+    const colony = data.colony;
+    const turn: ColonyTurn = data.turn;
+    const recentTurns = data.recent_turns ?? [];
     app.innerHTML = '';
 
     const layout = document.createElement('div');
@@ -31,14 +34,25 @@ async function showColony(colonyId: number) {
 
     const left = document.createElement('div');
     left.className = 'colony-left';
-    left.appendChild(ColonyStatus(colony, turn));
+    left.appendChild(ColonyStatus(colony, turn, recentTurns));
+
+    const centre = document.createElement('div');
+    centre.className = 'colony-centre';
 
     const right = document.createElement('div');
     right.className = 'colony-right';
 
-    // Mutable state shared between TurnLog and AllocationPanel
     let activeTurn: ColonyTurn = turn;
     let activeResolution: TurnResolution | null = null;
+
+    async function refreshStatus() {
+      try {
+        const d = await fetchColony(colonyId) as any;
+        activeTurn = d.turn;
+        left.innerHTML = '';
+        left.appendChild(ColonyStatus(d.colony, d.turn, d.recent_turns ?? []));
+      } catch { /* silent */ }
+    }
 
     function renderRight() {
       right.innerHTML = '';
@@ -46,26 +60,26 @@ async function showColony(colonyId: number) {
         activeResolution, activeTurn,
         (_sn) => { refreshStatus(); },
         (_ss, _slIndex) => { refreshStatus(); },
+        () => {
+          // Turn finalized — reset for next month
+          activeResolution = null;
+          refreshStatus();
+          centre.innerHTML = '';
+          renderCentre();
+          renderRight();
+        },
       ));
     }
 
-    async function refreshStatus() {
-      try {
-        const { colony: c2, turn: t2 } = await fetchColony(colonyId);
-        activeTurn = t2;
-        left.innerHTML = '';
-        left.appendChild(ColonyStatus(c2, t2));
-      } catch { /* silent */ }
+    function renderCentre() {
+      centre.appendChild(TurnLog(colonyId, (res: TurnResolution) => {
+        activeResolution = res;
+        renderRight();
+        refreshStatus();
+      }));
     }
 
-    const centre = document.createElement('div');
-    centre.className = 'colony-centre';
-    centre.appendChild(TurnLog(colonyId, (res: TurnResolution) => {
-      activeResolution = res;
-      renderRight();
-      refreshStatus();
-    }));
-
+    renderCentre();
     renderRight();
 
     layout.appendChild(left);

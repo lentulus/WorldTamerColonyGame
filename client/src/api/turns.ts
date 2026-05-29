@@ -1,4 +1,4 @@
-import type { RationAllocation, MaterialsAllocation, IndustrialAllocation } from '@worldtamer/shared';
+import type { RationAllocation, MaterialsAllocation, IndustrialAllocation, FinalizeRequest, ColonyTurn } from '@worldtamer/shared';
 
 export async function allocateRations(
   colonyId: number,
@@ -24,6 +24,22 @@ export async function allocateMaterials(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(allocation),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(err.error ?? `Server error ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function finalizeTurn(
+  colonyId: number,
+  req: FinalizeRequest,
+): Promise<{ month: number; turn: ColonyTurn }> {
+  const res = await fetch(`/api/colonies/${colonyId}/turn/finalize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { error?: string };

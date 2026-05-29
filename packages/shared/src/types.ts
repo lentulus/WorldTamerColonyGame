@@ -145,6 +145,21 @@ export interface EventEffects {
   permanent_ag_roll_bonus?: number;
 }
 
+// ── Turn finalization ─────────────────────────────────────────────────────────
+
+export interface FinalizeRequest {
+  al: number;
+  il: number;
+  ml: number;
+  afl: number;
+  // Optional capital purchases (unit counts); server validates cost ≤ to_capital_cr
+  new_ac?: number;
+  new_ic_light?: number;
+  new_ic_heavy?: number;
+  new_ic_construction?: number;
+  new_mc?: number;
+}
+
 // ── Founding ──────────────────────────────────────────────────────────────────
 
 export interface FoundColonyRequest {

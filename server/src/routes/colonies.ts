@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { getWorldById } from '../db/meridian.js';
 import { createColony, getColony, ColonyConflictError } from '../db/colonies.js';
+import { getDb } from '../db/colony.js';
 import { computeWeatherFactor, computePhiMin } from '../engine/founding.js';
 import type { FoundColonyRequest } from '@worldtamer/shared';
 
@@ -48,7 +49,15 @@ colonies.get('/:id', (c) => {
   const data = getColony(id);
   if (!data) return c.json({ error: 'Colony not found' }, 404);
 
-  return c.json(data);
+  // Include last 5 completed turns for history display (month > 0)
+  const recentRows = getDb().prepare(`
+    SELECT month, sn, ss, sl, political_track
+    FROM colony_turns
+    WHERE colony_id = ? AND month > 0
+    ORDER BY month DESC LIMIT 5
+  `).all(id) as Array<{ month: number; sn: number; ss: number; sl: number; political_track: number }>;
+
+  return c.json({ ...data, recent_turns: recentRows });
 });
 
 export default colonies;

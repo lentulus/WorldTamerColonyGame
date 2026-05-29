@@ -19,10 +19,16 @@ import {
   computeSLReplenishment,
   computeSLIndex,
 } from '../engine/production.js';
+import {
+  computeMaintenanceCost,
+  computeInfrastructureEfficiency,
+  computeRoadRequirement,
+} from '../engine/maintenance.js';
 import { getSlBaseline } from '../db/colonies.js';
 import type {
   TurnResolution, EventEffects,
   RationAllocation, MaterialsAllocation, IndustrialAllocation,
+  FinalizeRequest, ColonyTurn,
 } from '@worldtamer/shared';
 
 const turns = new Hono();
@@ -397,6 +403,206 @@ turns.post('/:id/turn/allocate-industrial', async (c) => {
     sl_value:      new_sl_value,
     sl_index,
   }, 200);
+});
+
+// ── POST /api/colonies/:id/turn/finalize ──────────────────────────────────────
+
+turns.post('/:id/turn/finalize', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) return c.json({ error: 'Invalid id' }, 400);
+
+  const db = getDb();
+
+  const colRow = db.prepare('SELECT * FROM colonies WHERE id = ?')
+    .get(id) as Record<string, unknown> | undefined;
+  if (!colRow) return c.json({ error: 'Colony not found' }, 404);
+  if (!colRow.active_turn_json) return c.json({ error: 'No active turn — call turn/start first' }, 409);
+
+  const resolution = JSON.parse(String(colRow.active_turn_json)) as TurnResolution;
+
+  const prevTurn = db.prepare(`
+    SELECT total_laborers, al, il, ml, afl,
+           ac, ic_light, ic_heavy, ic_construction, mc, power_kw,
+           rations, raw_materials_t, housing_m3, sl_value_per_person, debt_cr,
+           sn, ss, sl, infrastructure_efficiency
+    FROM colony_turns WHERE colony_id = ? ORDER BY month DESC LIMIT 1
+  `).get(id) as Record<string, number> | undefined;
+
+  const body = await c.req.json() as FinalizeRequest;
+  const { al, il, ml, afl } = body;
+  const newTotal = al + il + ml + afl;
+  const prevTotal = prevTurn?.total_laborers ?? 0;
+  if (newTotal > prevTotal) {
+    return c.json({ error: `Labor total (${newTotal}) exceeds workforce (${prevTotal})` }, 400);
+  }
+
+  const tl       = Number(colRow.tech_level);
+  const newMonth = Number(colRow.current_month) + 1;
+  const colonyAge = newMonth; // months since founding (founded_month = 0)
+
+  // ── Reference data ────────────────────────────────────────────────────────
+  const agRef  = db.prepare('SELECT ac_cost_cr FROM ref_agriculture_tl WHERE tl = ?')
+    .get(tl) as { ac_cost_cr: number } | undefined ?? { ac_cost_cr: 0 };
+  const indRef = db.prepare('SELECT light_ic_cost_cr, heavy_ic_cost_cr, construction_ic_cost_cr FROM ref_industry_tl WHERE tl = ?')
+    .get(tl) as { light_ic_cost_cr: number; heavy_ic_cost_cr: number; construction_ic_cost_cr: number }
+    | undefined ?? { light_ic_cost_cr: 0, heavy_ic_cost_cr: 0, construction_ic_cost_cr: 0 };
+  const matRef = db.prepare('SELECT mc_cost_cr FROM ref_materials_tl WHERE tl = ?')
+    .get(tl) as { mc_cost_cr: number } | undefined ?? { mc_cost_cr: 0 };
+  const transRef = db.prepare('SELECT cost_mcr_per_km FROM ref_transport_tl WHERE tl = ?')
+    .get(tl) as { cost_mcr_per_km: number } | undefined ?? { cost_mcr_per_km: 0 };
+
+  // ── Capital purchases ─────────────────────────────────────────────────────
+  const newAc    = body.new_ac ?? 0;
+  const newIcL   = body.new_ic_light ?? 0;
+  const newIcH   = body.new_ic_heavy ?? 0;
+  const newIcC   = body.new_ic_construction ?? 0;
+  const newMc    = body.new_mc ?? 0;
+
+  const capitalCost = newAc * agRef.ac_cost_cr
+    + newIcL * indRef.light_ic_cost_cr
+    + newIcH * indRef.heavy_ic_cost_cr
+    + newIcC * indRef.construction_ic_cost_cr
+    + newMc  * matRef.mc_cost_cr;
+
+  const capitalAvailable = resolution.industrial_allocation?.to_capital_cr ?? 0;
+  if (capitalCost > capitalAvailable + 0.01) {
+    return c.json({
+      error: `Capital cost (${capitalCost.toFixed(0)} Cr) exceeds reserved credits (${capitalAvailable.toFixed(0)} Cr)`,
+    }, 400);
+  }
+
+  // ── Updated capital counts ────────────────────────────────────────────────
+  const ac             = (prevTurn?.ac  ?? 0) + newAc;
+  const ic_light       = (prevTurn?.ic_light ?? 0) + newIcL;
+  const ic_heavy       = (prevTurn?.ic_heavy ?? 0) + newIcH;
+  const ic_construction = (prevTurn?.ic_construction ?? 0) + newIcC;
+  const mc             = (prevTurn?.mc  ?? 0) + newMc;
+  const power_kw       = prevTurn?.power_kw ?? 0;
+
+  // ── New stockpiles ────────────────────────────────────────────────────────
+  const ra = resolution.rations_allocation
+    ?? { to_population: 0, to_stockpile: 0, to_export: 0, to_animals: 0 } as RationAllocation;
+  const ma = resolution.materials_allocation
+    ?? { to_agriculture: 0, to_industry: 0, to_energy: 0, to_stockpile: 0, to_export: 0 } as MaterialsAllocation;
+
+  const new_rations  = Math.max(0, resolution.rations_available - ra.to_population - ra.to_export - (ra.to_animals ?? 0));
+  const new_rm       = Math.max(0, resolution.raw_materials_available - ma.to_agriculture - ma.to_industry - (ma.to_energy ?? 0) - ma.to_export);
+
+  // ── Housing and SL ───────────────────────────────────────────────────────
+  const new_housing  = resolution.industrial_allocation
+    ? (prevTurn?.housing_m3 ?? 0) + (resolution.industrial_allocation.to_housing_cr ?? 0) / 100
+    : (prevTurn?.housing_m3 ?? 0);
+
+  const prevSlValue  = prevTurn?.sl_value_per_person ?? 0;
+  const slDecayed    = computeSLDecay(prevSlValue);
+  const cgCredits    = resolution.industrial_allocation?.to_consumer_goods_cr ?? 0;
+  const new_sl_value = slDecayed + computeSLReplenishment(cgCredits, newTotal || 1);
+  const sl_baseline  = getSlBaseline(Number(colRow.home_tl));
+  const sl_ratio     = sl_baseline > 0 ? new_sl_value / sl_baseline : 1.0;
+
+  // ── Satisfaction indices ─────────────────────────────────────────────────
+  const sn = resolution.sn ?? computeSN(0, newTotal || 1);
+  const ss = computeSS(new_housing, newTotal || 1);
+
+  // ── Maintenance ──────────────────────────────────────────────────────────
+  const totalCapitalValue = ac * agRef.ac_cost_cr
+    + ic_light * indRef.light_ic_cost_cr
+    + ic_heavy * indRef.heavy_ic_cost_cr
+    + ic_construction * indRef.construction_ic_cost_cr
+    + mc * matRef.mc_cost_cr;
+  const maintenance_cost_cr = computeMaintenanceCost(colonyAge, totalCapitalValue, 'all');
+
+  const new_debt = (prevTurn?.debt_cr ?? 0) + maintenance_cost_cr - 0; // no revenue yet
+
+  // ── Infrastructure efficiency ─────────────────────────────────────────────
+  const requiredKm = computeRoadRequirement(1);
+  const required_cr = requiredKm * transRef.cost_mcr_per_km * 1_000_000;
+  const roads_complete = required_cr > 0
+    ? Number(colRow.road_network_cr_spent) >= required_cr
+    : true;
+  const infrastructure_efficiency = computeInfrastructureEfficiency(roads_complete);
+
+  // ── Political state ───────────────────────────────────────────────────────
+  const political_track = Number(colRow.political_track);
+
+  // ── Write completed colony_turns row ─────────────────────────────────────
+  const r = resolution;
+  db.prepare(`
+    INSERT INTO colony_turns (
+      colony_id, month,
+      total_laborers, al, il, ml, afl,
+      ac, ic_light, ic_heavy, ic_construction, mc, power_kw,
+      rations, raw_materials_t, housing_m3, sl_value_per_person, debt_cr,
+      sn, ss, sl, political_track,
+      weather_roll, weather_dm, weather_outcome,
+      random_event_roll, political_roll, political_dm, political_outcome,
+      ag_output_roll, ag_output_dm, ag_output_mult,
+      ind_output_roll, ind_output_dm, ind_output_mult,
+      mat_output_roll, mat_output_dm, mat_output_mult,
+      q_a, q_i, q_m, infrastructure_efficiency, maintenance_cost_cr
+    ) VALUES (
+      ?, ?,
+      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?,
+      ?, ?, ?,
+      ?, ?, ?, ?,
+      ?, ?, ?,
+      ?, ?, ?,
+      ?, ?, ?,
+      ?, ?, ?, ?, ?
+    )
+  `).run(
+    id, newMonth,
+    newTotal, al, il, ml, afl,
+    ac, ic_light, ic_heavy, ic_construction, mc, power_kw,
+    new_rations, new_rm, new_housing, new_sl_value, new_debt,
+    sn, ss, sl_ratio, political_track,
+    r.weather.roll, r.weather.dm, r.weather.outcome,
+    r.random_event.event_roll ?? null,
+    r.political.roll, r.political.dm, r.political.outcome,
+    r.output_rolls.agriculture.roll, r.output_rolls.agriculture.dm, r.output_rolls.agriculture.multiplier,
+    r.output_rolls.industry.roll, r.output_rolls.industry.dm, r.output_rolls.industry.multiplier,
+    r.output_rolls.materials.roll, r.output_rolls.materials.dm, r.output_rolls.materials.multiplier,
+    r.q_a, r.q_i, r.q_m, infrastructure_efficiency, maintenance_cost_cr,
+  );
+
+  // ── Advance colony record ─────────────────────────────────────────────────
+  db.prepare('UPDATE colonies SET current_month = ?, active_turn_json = NULL WHERE id = ?')
+    .run(newMonth, id);
+
+  // Return the completed turn snapshot
+  const newTurnRow = db.prepare(
+    'SELECT * FROM colony_turns WHERE colony_id = ? AND month = ?'
+  ).get(id, newMonth) as Record<string, unknown>;
+
+  const turn: ColonyTurn = {
+    colony_id: Number(newTurnRow.colony_id),
+    month:     Number(newTurnRow.month),
+    total_laborers: Number(newTurnRow.total_laborers),
+    al: Number(newTurnRow.al), il: Number(newTurnRow.il),
+    ml: Number(newTurnRow.ml), afl: Number(newTurnRow.afl),
+    ac: Number(newTurnRow.ac), ic_light: Number(newTurnRow.ic_light),
+    ic_heavy: Number(newTurnRow.ic_heavy), ic_construction: Number(newTurnRow.ic_construction),
+    mc: Number(newTurnRow.mc), power_kw: Number(newTurnRow.power_kw),
+    rations: Number(newTurnRow.rations), raw_materials_t: Number(newTurnRow.raw_materials_t),
+    housing_m3: Number(newTurnRow.housing_m3),
+    sl_value_per_person: Number(newTurnRow.sl_value_per_person),
+    debt_cr: Number(newTurnRow.debt_cr),
+    sn: Number(newTurnRow.sn), ss: Number(newTurnRow.ss), sl: Number(newTurnRow.sl),
+    political_track: Number(newTurnRow.political_track),
+    weather_roll: null, weather_dm: null, weather_outcome: null,
+    random_event_roll: null, political_roll: null, political_dm: null, political_outcome: null,
+    ag_output_roll: null, ag_output_dm: null, ag_output_mult: null,
+    ind_output_roll: null, ind_output_dm: null, ind_output_mult: null,
+    mat_output_roll: null, mat_output_dm: null, mat_output_mult: null,
+    q_a: null, q_i: null, q_m: null,
+    infrastructure_efficiency: Number(newTurnRow.infrastructure_efficiency),
+    maintenance_cost_cr: Number(newTurnRow.maintenance_cost_cr),
+  };
+
+  return c.json({ month: newMonth, turn }, 200);
 });
 
 export default turns;
