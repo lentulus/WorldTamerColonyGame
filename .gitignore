@@ -34,3 +34,7 @@ Thumbs.db
 
 # Test coverage
 coverage/
+
+# Training output
+training/best_policy.json
+training/checkpoint_*.json
