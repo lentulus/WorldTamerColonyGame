@@ -27,6 +27,7 @@ async function showColony(colonyId: number) {
     const colony = data.colony;
     const turn: ColonyTurn = data.turn;
     const recentTurns = data.recent_turns ?? [];
+    const activeEvents = data.active_events ?? [];
     app.innerHTML = '';
 
     const layout = document.createElement('div');
@@ -34,7 +35,7 @@ async function showColony(colonyId: number) {
 
     const left = document.createElement('div');
     left.className = 'colony-left';
-    left.appendChild(ColonyStatus(colony, turn, recentTurns));
+    left.appendChild(ColonyStatus(colony, turn, recentTurns, activeEvents));
 
     const centre = document.createElement('div');
     centre.className = 'colony-centre';
@@ -50,7 +51,7 @@ async function showColony(colonyId: number) {
         const d = await fetchColony(colonyId) as any;
         activeTurn = d.turn;
         left.innerHTML = '';
-        left.appendChild(ColonyStatus(d.colony, d.turn, d.recent_turns ?? []));
+        left.appendChild(ColonyStatus(d.colony, d.turn, d.recent_turns ?? [], d.active_events ?? []));
       } catch { /* silent */ }
     }
 

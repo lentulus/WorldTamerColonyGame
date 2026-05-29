@@ -150,42 +150,42 @@ Working-style rules: [PROCEDURE.md](../../PROCEDURE.md).
 
 **Goal:** After the turn is rolled, the player allocates rations and raw materials. Server validates, computes SN, and stores allocations.
 
-- [ ] **4.1 [AI]** Write red math tests in `server/src/engine/production.test.ts`:
+- [x] **4.1 [AI]** Write red math tests in `server/src/engine/production.test.ts`:
   - `computeM(labor, capital)`: labor < capital case, labor = capital case, labor > capital case (capped at 1.5×capital), capital > labor case (capped at 1.25×labor). Hand-verify each result.
   - `computePhiT(t, orbitMonths, phiMin)`: returns phiMin at trough, 1.0 at peak; midpoint returns a value between the two.
   - `computeQA(M_A, q_A, R_A, phi, eta, powerFactor)`: verify against a worked example.
   - `computeSN(Q_A_allocated_to_population, totalLaborers)`: SN=1.0 when exactly adequate, correct scaling above and below.
 
-- [ ] **4.2 [HUMAN]** Review red tests.
+- [x] **4.2 [HUMAN]** Review red tests.
 
-- [ ] **4.3 [AI]** Implement pure functions in `server/src/engine/production.ts`: `computeM()`, `computePhiT()`, `computeQA()`, `computeSN()`.
+- [x] **4.3 [AI]** Implement pure functions in `server/src/engine/production.ts`: `computeM()`, `computePhiT()`, `computeQA()`, `computeSN()`.
 
-- [ ] **4.4 [AI]** Tests pass green.
+- [x] **4.4 [AI]** Tests pass green.
 
-- [ ] **4.5 [AI]** Implement `computeQM()` (materials output) in `production.ts`. Materials output uses the same `computeM()` formula but with `q_M × richness_modifier` from RVM.
+- [x] **4.5 [AI]** Implement `computeQM()` (materials output) in `production.ts`. Materials output uses the same `computeM()` formula but with `q_M × richness_modifier` from RVM.
 
-- [ ] **4.6 [AI]** Implement power check: `computePowerFactor(power_kw_available, ac, ic_total, mc, ref_industry_tl, ref_materials_tl)` — returns `min(1, available / required)`.
+- [x] **4.6 [AI]** Implement power check: `computePowerFactor(power_kw_available, ac, ic_total, mc, ref_industry_tl, ref_materials_tl)` — returns `min(1, available / required)`.
 
-- [ ] **4.7 [AI]** Implement `POST /api/colonies/:id/turn/allocate-rations`:
+- [x] **4.7 [AI]** Implement `POST /api/colonies/:id/turn/allocate-rations`:
   - Validates: allocated totals ≤ stockpile + produced this turn.
   - Stores: population allocation (must ≥ subsistence, else records shortfall), stockpile delta, export.
   - Computes and stores interim SN for this turn.
 
-- [ ] **4.8 [AI]** Implement `POST /api/colonies/:id/turn/allocate-materials`:
+- [x] **4.8 [AI]** Implement `POST /api/colonies/:id/turn/allocate-materials`:
   - Validates: allocated totals ≤ produced + stockpile.
   - Stores: allocation to agriculture (RM consumed), industry, energy, stockpile, export.
 
-- [ ] **4.9 [AI]** Implement client allocation panel (right panel), rations section:
+- [x] **4.9 [AI]** Implement client allocation panel (right panel), rations section:
   - Shows produced this turn + stockpile.
   - Input fields: to population, to stockpile, to export, to animals.
   - Live SN preview as the player types.
   - Validation warning if population allocation < subsistence.
 
-- [ ] **4.10 [AI]** Implement client allocation panel, raw materials section. Same pattern.
+- [x] **4.10 [AI]** Implement client allocation panel, raw materials section. Same pattern.
 
-- [ ] **4.11 [UI]** Player sees produced rations and raw materials. Enters allocations. SN updates live as they type. Submitting saves allocations and advances the turn log.
+- [x] **4.11 [UI]** Player sees produced rations and raw materials. Enters allocations. SN updates live as they type. Submitting saves allocations and advances the turn log.
 
-- [ ] **4.12 [HUMAN]** Approve commit *(double-approval gate)*: `green: rations and materials allocation — production engine, SN, allocation panels`.
+- [x] **4.12 [HUMAN]** Approve commit *(double-approval gate)*: `green: rations and materials allocation — production engine, SN, allocation panels`.
 
 ---
 
@@ -193,31 +193,31 @@ Working-style rules: [PROCEDURE.md](../../PROCEDURE.md).
 
 **Goal:** Player allocates industrial output. Server updates housing, SL goods value, and applies the political track change from the earlier roll. SS and SL computed.
 
-- [ ] **5.1 [AI]** Write red math tests:
+- [x] **5.1 [AI]** Write red math tests:
   - `computeQI(M_I, q_I, eta, powerFactor)`: verify against a worked example from the WTH industry table.
   - `computeSS(housing_m3, totalPeople)`: SS = housing_m3 / totalPeople, with boundary values at the SS table bands.
   - `computeSLDecay(prev_sl_value)`: returns prev × 0.98 (2% monthly decay).
   - `computeSLReplenishment(consumer_goods_credits_allocated, totalPeople)`: credits per person.
   - `computeSLIndex(sl_value, baseline_sl_value)`: correct DM for each band above/below baseline, rising/falling.
 
-- [ ] **5.2 [HUMAN]** Review red tests.
+- [x] **5.2 [HUMAN]** Review red tests.
 
-- [ ] **5.3 [AI]** Implement in `production.ts`: `computeQI()`, `computeSS()`, `computeSLDecay()`, `computeSLReplenishment()`, `computeSLIndex()`.
+- [x] **5.3 [AI]** Implement in `production.ts`: `computeQI()`, `computeSS()`, `computeSLDecay()`, `computeSLReplenishment()`, `computeSLIndex()`.
 
-- [ ] **5.4 [AI]** Tests pass green.
+- [x] **5.4 [AI]** Tests pass green.
 
-- [ ] **5.5 [AI]** Implement `POST /api/colonies/:id/turn/allocate-industrial`:
+- [x] **5.5 [AI]** Implement `POST /api/colonies/:id/turn/allocate-industrial`:
   - Validates: allocations sum ≤ Q_I.
   - Allocation categories: new capital goods (credits reserved for capital purchase), housing construction (m³ = credits / 100), consumer goods replenishment, armed forces supply, export.
   - Updates `housing_m3`, applies SL decay, adds consumer goods replenishment.
   - Applies political track change from the earlier political roll.
   - Computes SS and SL for this turn.
 
-- [ ] **5.6 [AI]** Implement client industrial allocation panel. Show Q_I produced. Input fields for each category with a live balance display (allocated vs. available).
+- [x] **5.6 [AI]** Implement client industrial allocation panel. Show Q_I produced. Input fields for each category with a live balance display (allocated vs. available).
 
-- [ ] **5.7 [UI]** Player allocates industrial output across categories. Housing and consumer goods values update live. Political track change is shown in the turn log.
+- [x] **5.7 [UI]** Player allocates industrial output across categories. Housing and consumer goods values update live. Political track change is shown in the turn log.
 
-- [ ] **5.8 [HUMAN]** Approve commit *(double-approval gate)*: `green: industrial allocation — Q_I, SS/SL, political track, allocation panel`.
+- [x] **5.8 [HUMAN]** Approve commit *(double-approval gate)*: `green: industrial allocation — Q_I, SS/SL, political track, allocation panel`.
 
 ---
 
@@ -225,18 +225,18 @@ Working-style rules: [PROCEDURE.md](../../PROCEDURE.md).
 
 **Goal:** Player reassigns laborers for next turn. Server applies new capital, deducts maintenance, writes the completed turn record, and advances the month counter.
 
-- [ ] **6.1 [AI]** Write red math tests:
+- [x] **6.1 [AI]** Write red math tests:
   - `computeMaintenanceCost(colonyAgeMonths, capitalValue, capitalType)`: 0% for months 0–119; 0.1%/month at month 120; 0.2% at month 132; 0.3% at month 144; 0.4% at month 156+.
   - `computeInfrastructureEfficiency(roadsComplete)`: 0.60 when roads not complete, 1.0 when complete.
   - `computeRoadRequirement(inhabited_hex_count)`: 500 km per hex, cost from `ref_transport_tl`.
 
-- [ ] **6.2 [HUMAN]** Review red tests.
+- [x] **6.2 [HUMAN]** Review red tests.
 
-- [ ] **6.3 [AI]** Implement in `server/src/engine/maintenance.ts`: `computeMaintenanceCost()`, `computeInfrastructureEfficiency()`, `computeRoadRequirement()`.
+- [x] **6.3 [AI]** Implement in `server/src/engine/maintenance.ts`: `computeMaintenanceCost()`, `computeInfrastructureEfficiency()`, `computeRoadRequirement()`.
 
-- [ ] **6.4 [AI]** Tests pass green.
+- [x] **6.4 [AI]** Tests pass green.
 
-- [ ] **6.5 [AI]** Implement `POST /api/colonies/:id/turn/finalize`:
+- [x] **6.5 [AI]** Implement `POST /api/colonies/:id/turn/finalize`:
   - Accepts new labor assignments (AL/IL/ML/AFL) — validates total ≤ working-age population.
   - Converts industrial capital credits to new capital units at the colony's TL cost.
   - Computes and deducts maintenance cost (age-gated).
@@ -245,15 +245,15 @@ Working-style rules: [PROCEDURE.md](../../PROCEDURE.md).
   - Increments `colonies.current_month`.
   - Returns the completed turn snapshot.
 
-- [ ] **6.6 [AI]** Implement client labor reassignment form: sliders or number inputs for AL/IL/ML/AFL with a live total showing remaining unassigned workers.
+- [x] **6.6 [AI]** Implement client labor reassignment form: sliders or number inputs for AL/IL/ML/AFL with a live total showing remaining unassigned workers.
 
-- [ ] **6.7 [AI]** Implement "Advance Turn" button — calls finalize, then refreshes colony status panel.
+- [x] **6.7 [AI]** Implement "Advance Turn" button — calls finalize, then refreshes colony status panel.
 
-- [ ] **6.8 [AI]** Add a simple turn history list to the left panel (last 5 turns: month, SN/SS/SL, political track).
+- [x] **6.8 [AI]** Add a simple turn history list to the left panel (last 5 turns: month, SN/SS/SL, political track).
 
-- [ ] **6.9 [UI]** Player reassigns laborers, clicks Advance Turn. Colony status panel updates to the new month. Turn history shows the completed month.
+- [x] **6.9 [UI]** Player reassigns laborers, clicks Advance Turn. Colony status panel updates to the new month. Turn history shows the completed month.
 
-- [ ] **6.10 [HUMAN]** Approve commit *(double-approval gate)*: `green: labor reassignment, capital, maintenance, turn finalization`.
+- [x] **6.10 [HUMAN]** Approve commit *(double-approval gate)*: `green: labor reassignment, capital, maintenance, turn finalization`.
 
 ---
 
@@ -261,30 +261,30 @@ Working-style rules: [PROCEDURE.md](../../PROCEDURE.md).
 
 **Goal:** Storm damage applies to capital/housing/rations. Random events fire when triggered, with multi-turn duration effects. Acclimatization stage advances monthly.
 
-- [ ] **7.1 [AI]** Write red math tests in `server/src/engine/events.test.ts`:
+- [x] **7.1 [AI]** Write red math tests in `server/src/engine/events.test.ts`:
   - `computeStormDamage(roll_1d6, colonyTL, stormType)`: severe storm capital loss formula `(1D6 − TL) × 5`; catastrophic storm `(1D20 − TL) × 10`. Verify floors at 0.
   - `computeRandomEventEffect(eventRoll, currentState)`: for events with deterministic effects (e.g., vermin minor: rations × 0.25 consumed), verify the output.
   - `computeAcclimatizationAdvance(stage, roll)`: advance only on the required difficulty threshold.
 
-- [ ] **7.2 [HUMAN]** Review red tests.
+- [x] **7.2 [HUMAN]** Review red tests.
 
-- [ ] **7.3 [AI]** Implement `server/src/engine/events.ts`:
+- [x] **7.3 [AI]** Implement `server/src/engine/events.ts`:
   - `resolveWeatherDamage()` — all four storm severity cases from WTH table.
   - `resolveRandomEvent()` — all 20 events from `ref_random_events`. Immediate effects applied inline; duration effects written to `colony_events` table.
   - `applyActiveEvents()` — called at turn start; reads `colony_events` where `active_until_month >= current_month` and applies recurring modifiers.
   - `resolveAcclimatization()` — monthly stage roll; catastrophic failure handling.
 
-- [ ] **7.4 [AI]** Tests pass green.
+- [x] **7.4 [AI]** Tests pass green.
 
-- [ ] **7.5 [AI]** Wire events into turn resolution: `POST /api/colonies/:id/turn/start` now also calls `applyActiveEvents()` before rolling output.
+- [x] **7.5 [AI]** Wire events into turn resolution: `POST /api/colonies/:id/turn/start` now also calls `applyActiveEvents()` before rolling output, `resolveAcclimatization()` updates stage, `resolveWeatherDamage()` computes storm damage, `resolveRandomEvent()` handles random events. Active DMs applied to ag/ind/mat output rolls. Storm damage and random event losses propagated through TurnResolution to finalize.
 
-- [ ] **7.6 [AI]** Permanent event bonuses (tasty local lifeform: +1 all future agriculture rolls; hardy lifeform: +2) stored as permanent modifiers in `colonies` table rather than expiring events.
+- [x] **7.6 [AI]** Permanent event bonuses (tasty local lifeform: +1 all future agriculture rolls; hardy lifeform: +2) stored as permanent modifiers in `colonies` table rather than expiring events.
 
-- [ ] **7.7 [AI]** Show active events and their remaining duration in the turn log and status panel.
+- [x] **7.7 [AI]** Show active events and their remaining duration in the turn log and status panel.
 
-- [ ] **7.8 [UI]** Player sees storm damage described in the turn log. Active multi-turn events (plague, drought) show in status panel with months remaining. Acclimatization stage shown with its output DM.
+- [x] **7.8 [UI]** Player sees storm damage described in the turn log. Active multi-turn events (plague, drought) show in status panel with months remaining. Acclimatization stage shown with its output DM.
 
-- [ ] **7.9 [HUMAN]** Approve commit *(double-approval gate)*: `green: weather damage, random events, acclimatization`.
+- [x] **7.9 [HUMAN]** Approve commit *(double-approval gate)*: `green: weather damage, random events, acclimatization`.
 
 ---
 

@@ -13,7 +13,30 @@ function multStr(m: number): string {
   return `×${m.toFixed(2)}`;
 }
 
+function activeDMSummary(dms: TurnResolution['active_event_dms']): string {
+  const parts: string[] = [];
+  if (dms.all_output_dm) parts.push(`all output ${sign(dms.all_output_dm)}`);
+  if (dms.ag_output_dm)  parts.push(`ag ${sign(dms.ag_output_dm)}`);
+  if (dms.ind_output_dm) parts.push(`industry ${sign(dms.ind_output_dm)}`);
+  if (dms.mat_output_dm) parts.push(`materials ${sign(dms.mat_output_dm)}`);
+  if (dms.political_dm)  parts.push(`political ${sign(dms.political_dm)}`);
+  return parts.join(', ');
+}
+
 function renderResolution(r: TurnResolution): string {
+  // ── Acclimatization ────────────────────────────────────────────────────────
+  const accl = r.acclimatization;
+  let acclLine = '';
+  if (accl) {
+    if (accl.advanced) {
+      acclLine = `roll ${accl.roll} — stage ${accl.old_stage} → <strong>${accl.new_stage}</strong> (output DM now ${sign(accl.dm)})`;
+    } else if (accl.new_stage >= 5) {
+      acclLine = `roll ${accl.roll} — fully acclimatized, no DM penalty`;
+    } else {
+      acclLine = `roll ${accl.roll} — stage ${accl.new_stage} unchanged, output DM ${sign(accl.dm)}`;
+    }
+  }
+
   // ── Step 1 ────────────────────────────────────────────────────────────────
   const wOutcome = r.weather.outcome.replace(/_/g, ' ');
   const wDetail = r.weather.dm !== 0
@@ -48,17 +71,33 @@ function renderResolution(r: TurnResolution): string {
   const matDetail = mat.dm !== 0 ? ` &mdash; ${dmLabel(mat.dm, mat.adjusted)}` : '';
 
   // ── Alerts ────────────────────────────────────────────────────────────────
-  const weatherAlert = r.weather.outcome !== 'none'
-    ? `<div class="turn-alert turn-alert--weather">${r.weather.description}</div>`
+  const stormDmg = r.storm_damage ?? 0;
+  const stormNote = stormDmg > 0
+    ? ` Storm destroyed ${stormDmg} unit${stormDmg !== 1 ? 's' : ''} of agricultural capital.`
     : '';
+  const weatherAlert = r.weather.outcome !== 'none'
+    ? `<div class="turn-alert turn-alert--weather">${r.weather.description}${stormNote}</div>`
+    : '';
+
+  const rationLoss = r.random_event_rations_lost ?? 0;
+  const housingLoss = r.random_event_housing_lost ?? 0;
+  let lossNote = '';
+  if (rationLoss > 0) lossNote += ` Rations lost: ${rationLoss.toFixed(1)}.`;
+  if (housingLoss > 0) lossNote += ` Housing lost: ${housingLoss.toFixed(0)} m³.`;
   const eventAlert = r.random_event.triggered && r.random_event.description
-    ? `<div class="turn-alert turn-alert--event">${r.random_event.description}</div>`
+    ? `<div class="turn-alert turn-alert--event">${r.random_event.description}${lossNote}</div>`
+    : '';
+
+  const activeSummary = activeDMSummary(r.active_event_dms);
+  const activeDMNote = activeSummary
+    ? `<div class="turn-row turn-row--note"><span class="turn-key">Ongoing event DMs</span><span>${activeSummary}</span></div>`
     : '';
 
   return `
     ${weatherAlert}${eventAlert}
     <div class="turn-section">
       <div class="turn-step-label">Step 1 — Events &amp; Politics (Month ${r.month})</div>
+      ${acclLine ? `<div class="turn-row"><span class="turn-key">Acclimatization</span><span>${acclLine}</span></div>` : ''}
       <div class="turn-row">
         <span class="turn-key">Weather</span>
         <span>roll ${r.weather.roll}${wDetail} → <strong>${wOutcome}</strong></span>
@@ -75,6 +114,7 @@ function renderResolution(r: TurnResolution): string {
 
     <div class="turn-section">
       <div class="turn-step-label">Step 2 — Output Rolls</div>
+      ${activeDMNote}
       <div class="turn-row">
         <span class="turn-key">Agriculture</span>
         <span>roll ${ag.roll}${agDetail} → <strong>${multStr(ag.multiplier)}</strong></span>

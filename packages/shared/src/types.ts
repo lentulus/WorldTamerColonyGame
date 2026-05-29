@@ -218,6 +218,16 @@ export interface TurnResolution {
     materials:   { roll: number; dm: number; adjusted: number; multiplier: number };
   };
   active_event_dms: EventEffects;
+  acclimatization: {
+    old_stage: number;
+    new_stage: number;
+    roll: number;
+    advanced: boolean;
+    dm: number;
+  };
+  storm_damage: number;
+  random_event_rations_lost: number;
+  random_event_housing_lost: number;
 
   // Production quantities computed at turn/start (base output × dice multiplier)
   q_a: number;

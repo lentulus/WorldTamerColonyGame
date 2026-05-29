@@ -8,12 +8,12 @@ and where to find the authoritative details.
 
 ## TL;DR for a fresh session
 
-**Slices 0–3 complete. Next action: begin Slice 4 (rations + raw materials allocation, SN).**
+**Slices 0–7 complete. Next action: begin Slice 8 (infrastructure — road network, transport capacity).**
 
 First actions in a new session:
 1. Read this file.
 2. `git log --oneline -6` and `git status` — confirm current state.
-3. Open [ColonySimChecklist.md](supporting/docs/ColonySimChecklist.md) and find the first unchecked step (currently **4.1**).
+3. Open [ColonySimChecklist.md](supporting/docs/ColonySimChecklist.md) and find the first unchecked step (currently **8.1**).
 4. Read [ColonySimDesign.md](supporting/docs/ColonySimDesign.md) for architecture decisions before writing any code.
 5. Apply the double-approval gate before doing anything irreversible.
 
@@ -104,8 +104,8 @@ WorldTamer/
         └── seed.sql                 WTH reference data (all ref_* tables, TL 0–15)
 ```
 
-**Test count: 70 green** (32 rolls + 15 math + 11 Meridian + 9 HTTP colonies + 2 HTTP worlds + 1 clamping).
-`pnpm test` from root runs all workspaces.
+**Test count: 164 green** (32 rolls + 53 production + 18 maintenance + 15 founding + 23 events + 11 Meridian + 9 HTTP colonies + 2 HTTP worlds + 1 clamping).
+`pnpm test` from root runs all workspaces (shared and client pass with no test files).
 
 ---
 
@@ -137,15 +137,16 @@ WorldTamer/
 | 1 | World selection from Meridian | **Done** `e313c9a` |
 | 2 | Colony founding, turn 0 snapshot | **Done** `c324558` |
 | 3 | Turn resolution: dice, weather, political events, output rolls | **Done** `a5fb4c2` |
-| **4** | **Rations + raw materials allocation, SN** | **Next** |
-| 5 | Industrial allocation, SS/SL, political track | Not started |
-| 6 | Labor reassignment, capital, maintenance, finalization | Not started |
-| 7 | Weather damage, random events, acclimatization | Not started |
-| 8 | Infrastructure | Not started |
+| 4 | Rations + raw materials allocation, SN | **Done** `92446a4` |
+| 5 | Industrial allocation, SS/SL, political track | **Done** `38ee14d` |
+| 6 | Labor reassignment, capital, maintenance, finalization | **Done** `2e2f917` |
+| 7 | Weather damage, random events, acclimatization | **Done** *(this commit)* |
+| **8** | **Infrastructure** | **Next** |
 | 9 | Smoke test + sign-off | Not started |
 
-**First step of Slice 4 is 4.1** — write red math tests for `computeM()`, `computePhiT()`,
-`computeQA()`, and `computeSN()` in `server/src/engine/production.test.ts`.
+**First step of Slice 8 is 8.1** — write red tests for `computeRoadNetworkStatus()`,
+`computeTransportCapacity()`, and `computeTransportDemand()` in
+`server/src/engine/infrastructure.test.ts`.
 
 ---
 

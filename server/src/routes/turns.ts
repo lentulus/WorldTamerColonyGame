@@ -24,6 +24,12 @@ import {
   computeInfrastructureEfficiency,
   computeRoadRequirement,
 } from '../engine/maintenance.js';
+import {
+  applyActiveEvents,
+  resolveWeatherDamage,
+  resolveRandomEvent,
+  resolveAcclimatization,
+} from '../engine/events.js';
 import { getSlBaseline } from '../db/colonies.js';
 import type {
   TurnResolution, EventEffects,
@@ -83,13 +89,20 @@ turns.post('/:id/turn/start', (c) => {
     FROM colony_turns WHERE colony_id = ? ORDER BY month DESC LIMIT 1
   `).get(id) as Record<string, number> | undefined;
 
+  const tl           = Number(colRow.tech_level);
+  const newMonth     = Number(colRow.current_month) + 1;
+  const rations      = prevTurn?.rations ?? 0;
+  const housingPrev  = prevTurn?.housing_m3 ?? 0;
+
   const snDMValues   = snDMs(prevTurn?.sn ?? 1.0);
   const ssPolitDM    = ssPoliticalDM(prevTurn?.ss ?? 100);
-  const acclDM       = acclimatizationDM(Number(colRow.acclimatization_stage));
+  const oldAcclStage = Number(colRow.acclimatization_stage);
+  const acclResult   = resolveAcclimatization(id, oldAcclStage);
+  const acclDM       = acclimatizationDM(acclResult.new_stage);
+  const activeDMs    = applyActiveEvents(id, newMonth);
   const politTrack   = Number(colRow.political_track);
   const weatherFactor = Number(colRow.weather_factor);
   const agBonus      = Number(colRow.ag_output_roll_bonus);
-  const newMonth     = Number(colRow.current_month) + 1;
 
   // ── Step 1: Weather ───────────────────────────────────────────────────────
   const weatherRoll     = d20();
@@ -103,34 +116,25 @@ turns.post('/:id/turn/start', (c) => {
       VALUES (?, ?, 'weather', ?, '{}', NULL)
     `).run(id, newMonth, WEATHER_DESCRIPTION[weatherOutcome]);
   }
+  const stormDamage = resolveWeatherDamage(weatherOutcome, tl, id, newMonth);
 
   // ── Step 1: Random event trigger ──────────────────────────────────────────
   const reTriggerRoll = d20();
   let reEventRoll: number | null = null;
   let reDescription: string | null = null;
   let reEffects: EventEffects | null = null;
+  let reImpact = { rations_lost: 0, housing_lost: 0 };
 
   if (reTriggerRoll >= 16) {
     reEventRoll = d20();
-    const reRow = db.prepare(
-      `SELECT event_label, description, effects, duration_months
-       FROM ref_random_events WHERE roll = ?`
-    ).get(reEventRoll) as {
-      event_label: string; description: string;
-      effects: string; duration_months: number;
-    } | undefined;
-
-    if (reRow) {
-      reDescription = `${reRow.event_label}: ${reRow.description}`;
-      reEffects = JSON.parse(reRow.effects) as EventEffects;
-      const activeUntil = reRow.duration_months > 0
-        ? newMonth + reRow.duration_months - 1
-        : null;
-      db.prepare(`
-        INSERT INTO colony_events (colony_id, month, event_type, description, effects, active_until_month)
-        VALUES (?, ?, 'random', ?, ?, ?)
-      `).run(id, newMonth, reRow.description, reRow.effects, activeUntil);
-    }
+    db.prepare(`
+      INSERT INTO colony_events (colony_id, month, event_type, description, effects, active_until_month)
+      VALUES (?, ?, 'random', '', '{}', NULL)
+    `).run(id, newMonth);
+    const reResult = resolveRandomEvent(reEventRoll, id, newMonth, rations, housingPrev);
+    reDescription = reResult.description;
+    reEffects = reResult.effects;
+    reImpact = reResult.impact;
   }
 
   // ── Step 1: Political roll ────────────────────────────────────────────────
@@ -160,23 +164,24 @@ turns.post('/:id/turn/start', (c) => {
   }
 
   const agRoll = d20();
-  const agDM   = applyOutputDMs(-1, agPolitDM, snDMValues.output_dm, acclDM) + agBonus;
+  const agDM   = applyOutputDMs(-1, agPolitDM, snDMValues.output_dm, acclDM) + agBonus
+               + (activeDMs.all_output_dm ?? 0) + (activeDMs.ag_output_dm ?? 0);
   const agAdj  = agRoll + agDM;
   const agMult = lookupOutputMultiplier(agAdj);
 
   const indRoll = d20();
-  const indDM   = applyOutputDMs(-1, indPolitDM, snDMValues.output_dm, acclDM);
+  const indDM   = applyOutputDMs(-1, indPolitDM, snDMValues.output_dm, acclDM)
+               + (activeDMs.all_output_dm ?? 0) + (activeDMs.ind_output_dm ?? 0);
   const indAdj  = indRoll + indDM;
   const indMult = lookupOutputMultiplier(indAdj);
 
   const matRoll = d20();
-  const matDM   = applyOutputDMs(-1, matPolitDM, snDMValues.output_dm, acclDM);
+  const matDM   = applyOutputDMs(-1, matPolitDM, snDMValues.output_dm, acclDM)
+               + (activeDMs.all_output_dm ?? 0) + (activeDMs.mat_output_dm ?? 0);
   const matAdj  = matRoll + matDM;
   const matMult = lookupOutputMultiplier(matAdj);
 
   // ── Production computation ────────────────────────────────────────────────
-  const tl = Number(colRow.tech_level);
-
   const agRef = db.prepare(
     'SELECT base_output_rations, rm_t_per_month FROM ref_agriculture_tl WHERE tl = ?'
   ).get(tl) as { base_output_rations: number; rm_t_per_month: number } | undefined
@@ -199,7 +204,6 @@ turns.post('/:id/turn/start', (c) => {
   const icTotal = (prevTurn?.ic_light ?? 0) + (prevTurn?.ic_heavy ?? 0) + (prevTurn?.ic_construction ?? 0);
   const powerKw = prevTurn?.power_kw ?? 0;
   const rawMat  = prevTurn?.raw_materials_t ?? 0;
-  const rations = prevTurn?.rations ?? 0;
   const eta     = prevTurn?.infrastructure_efficiency ?? 1.0;
 
   const powerFactor = computePowerFactor(powerKw, icTotal, mc, indRef.kw_per_unit, matRef.kw_per_unit);
@@ -218,7 +222,7 @@ turns.post('/:id/turn/start', (c) => {
   const M_I  = computeM(il, icTotal);
   const q_i  = computeQI(M_I, indRef.output_cr_per_il_month, eta, powerFactor) * indMult;
 
-  const rations_available       = q_a + rations;
+  const rations_available       = q_a + rations - reImpact.rations_lost;
   const raw_materials_available = q_m + rawMat;
 
   // ── Build and persist TurnResolution ─────────────────────────────────────
@@ -246,7 +250,17 @@ turns.post('/:id/turn/start', (c) => {
       industry:    { roll: indRoll, dm: indDM, adjusted: indAdj, multiplier: indMult },
       materials:   { roll: matRoll, dm: matDM, adjusted: matAdj, multiplier: matMult },
     },
-    active_event_dms: {},
+    active_event_dms: activeDMs,
+    acclimatization: {
+      old_stage: oldAcclStage,
+      new_stage: acclResult.new_stage,
+      roll: acclResult.roll,
+      advanced: acclResult.advanced,
+      dm: acclDM,
+    },
+    storm_damage: stormDamage,
+    random_event_rations_lost: reImpact.rations_lost,
+    random_event_housing_lost: reImpact.housing_lost,
     q_a,
     q_m,
     q_i,
@@ -472,7 +486,9 @@ turns.post('/:id/turn/finalize', async (c) => {
   }
 
   // ── Updated capital counts ────────────────────────────────────────────────
-  const ac             = (prevTurn?.ac  ?? 0) + newAc;
+  // Storm damage destroys agricultural capital (capital_sector: 'ac' in resolveWeatherDamage)
+  const stormDamageAC  = resolution.storm_damage ?? 0;
+  const ac             = Math.max(0, (prevTurn?.ac ?? 0) + newAc - stormDamageAC);
   const ic_light       = (prevTurn?.ic_light ?? 0) + newIcL;
   const ic_heavy       = (prevTurn?.ic_heavy ?? 0) + newIcH;
   const ic_construction = (prevTurn?.ic_construction ?? 0) + newIcC;
@@ -489,9 +505,13 @@ turns.post('/:id/turn/finalize', async (c) => {
   const new_rm       = Math.max(0, resolution.raw_materials_available - ma.to_agriculture - ma.to_industry - (ma.to_energy ?? 0) - ma.to_export);
 
   // ── Housing and SL ───────────────────────────────────────────────────────
-  const new_housing  = resolution.industrial_allocation
-    ? (prevTurn?.housing_m3 ?? 0) + (resolution.industrial_allocation.to_housing_cr ?? 0) / 100
-    : (prevTurn?.housing_m3 ?? 0);
+  const housingBuilt = resolution.industrial_allocation
+    ? (resolution.industrial_allocation.to_housing_cr ?? 0) / 100
+    : 0;
+  const new_housing  = Math.max(
+    0,
+    (prevTurn?.housing_m3 ?? 0) + housingBuilt - (resolution.random_event_housing_lost ?? 0),
+  );
 
   const prevSlValue  = prevTurn?.sl_value_per_person ?? 0;
   const slDecayed    = computeSLDecay(prevSlValue);

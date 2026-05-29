@@ -57,7 +57,16 @@ colonies.get('/:id', (c) => {
     ORDER BY month DESC LIMIT 5
   `).all(id) as Array<{ month: number; sn: number; ss: number; sl: number; political_track: number }>;
 
-  return c.json({ ...data, recent_turns: recentRows });
+  // Active ongoing events (duration effects still running)
+  const currentMonth = data.colony.current_month;
+  const activeEvents = getDb().prepare(`
+    SELECT event_type, description, active_until_month
+    FROM colony_events
+    WHERE colony_id = ? AND active_until_month IS NOT NULL AND active_until_month >= ?
+    ORDER BY active_until_month ASC
+  `).all(id, currentMonth) as Array<{ event_type: string; description: string; active_until_month: number }>;
+
+  return c.json({ ...data, recent_turns: recentRows, active_events: activeEvents });
 });
 
 export default colonies;

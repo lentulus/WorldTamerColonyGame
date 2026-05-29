@@ -1,5 +1,7 @@
 import type { Colony, ColonyTurn } from '@worldtamer/shared';
 
+type ActiveEvent = { event_type: string; description: string; active_until_month: number };
+
 const PT_LABELS: Record<number, string> = {
   3: 'Excellent', 2: 'Very Good', 1: 'Good', 0: 'Fair',
   '-1': 'Marginal', '-2': 'Poor', '-3': 'Terrible',
@@ -29,7 +31,16 @@ function fmt(n: number, dp = 0): string {
 
 type RecentTurn = { month: number; sn: number; ss: number; sl: number; political_track: number };
 
-export function ColonyStatus(colony: Colony, turn: ColonyTurn, recentTurns: RecentTurn[] = []): HTMLElement {
+function acclOutputDM(stage: number): number {
+  return Math.min(0, stage - 5);
+}
+
+export function ColonyStatus(
+  colony: Colony,
+  turn: ColonyTurn,
+  recentTurns: RecentTurn[] = [],
+  activeEvents: ActiveEvent[] = [],
+): HTMLElement {
   const root = document.createElement('div');
   root.className = 'status-panel';
 
@@ -90,10 +101,24 @@ export function ColonyStatus(colony: Colony, turn: ColonyTurn, recentTurns: Rece
     </div>
 
     <div class="status-section">
-      <div class="status-label">Politics</div>
+      <div class="status-label">Politics &amp; Acclimatization</div>
       <div class="status-row"><span>Political track</span><span>${ptLabel} (${turn.political_track >= 0 ? '+' : ''}${turn.political_track})</span></div>
-      <div class="status-row"><span>Acclimatization</span><span>Stage ${colony.acclimatization_stage}/5</span></div>
+      <div class="status-row">
+        <span>Acclimatization</span>
+        <span>Stage ${colony.acclimatization_stage}/5${acclOutputDM(colony.acclimatization_stage) < 0 ? ` &nbsp;·&nbsp; output DM ${acclOutputDM(colony.acclimatization_stage)}` : ' (full)'}</span>
+      </div>
     </div>
+    ${activeEvents.length > 0 ? `
+    <div class="status-section">
+      <div class="status-label">Active events</div>
+      ${activeEvents.map(e => {
+        const monthsLeft = e.active_until_month - colony.current_month;
+        return `<div class="status-row active-event-row">
+          <span>${e.description}</span>
+          <span class="event-months-left">${monthsLeft} mo.</span>
+        </div>`;
+      }).join('')}
+    </div>` : ''}
     ${recentTurns.length > 0 ? `
     <div class="status-section">
       <div class="status-label">Turn history</div>
