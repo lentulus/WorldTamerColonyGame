@@ -67,6 +67,62 @@ export function computePowerFactor(
   return Math.min(1.0, powerKw / required);
 }
 
+// ── Industrial output (WTH Ch.5) ─────────────────────────────────────────────
+// Q_I = M_I × q_I × eta × powerFactor
+// No seasonal or R_A factor — materials supply is player-allocated separately.
+
+export function computeQI(
+  M_I: number,
+  q_I: number,
+  eta: number,
+  powerFactor: number,
+): number {
+  return M_I * q_I * eta * powerFactor;
+}
+
+// ── Standard of Shelter (WTH Ch.5) ───────────────────────────────────────────
+// SS = housing_m3 / totalLaborers (raw m³ per laborer family unit).
+// Looked up in ref_ss_table by the caller.
+
+export function computeSS(housing_m3: number, totalLaborers: number): number {
+  if (totalLaborers === 0) return 0;
+  return housing_m3 / totalLaborers;
+}
+
+// ── SL decay (WTH Ch.5) ──────────────────────────────────────────────────────
+// Consumer goods depreciate 2% each month.
+
+export function computeSLDecay(prev_sl_value: number): number {
+  return prev_sl_value * 0.98;
+}
+
+// ── SL replenishment (WTH Ch.5) ──────────────────────────────────────────────
+// Credits spent on consumer goods → additional SL value per person.
+
+export function computeSLReplenishment(
+  consumer_goods_credits: number,
+  totalPeople: number,
+): number {
+  if (totalPeople === 0) return 0;
+  return consumer_goods_credits / totalPeople;
+}
+
+// ── SL satisfaction index (WTH Ch.5) ─────────────────────────────────────────
+// DM = f(sl_value / baseline_sl_value).
+// Bands: ≥1.20→+2, [1.05,1.20)→+1, [0.95,1.05)→0,
+//        [0.75,0.95)→−1, [0.50,0.75)→−2, <0.50→−3
+
+export function computeSLIndex(sl_value: number, baseline_sl_value: number): number {
+  if (baseline_sl_value === 0) return 0;
+  const ratio = sl_value / baseline_sl_value;
+  if (ratio >= 1.20) return  2;
+  if (ratio >= 1.05) return  1;
+  if (ratio >= 0.95) return  0;
+  if (ratio >= 0.75) return -1;
+  if (ratio >= 0.50) return -2;
+  return -3;
+}
+
 // ── Standard of Nutrition (WTH Ch.5) ─────────────────────────────────────────
 // SN = rations allocated to population / total laborers.
 // SN = 1.0 when each laborer family receives exactly one ration.

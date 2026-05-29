@@ -42,10 +42,11 @@ async function showColony(colonyId: number) {
 
     function renderRight() {
       right.innerHTML = '';
-      right.appendChild(AllocationPanel(activeResolution, activeTurn, (_sn) => {
-        // SN updated — refresh left status panel
-        refreshStatus();
-      }));
+      right.appendChild(AllocationPanel(
+        activeResolution, activeTurn,
+        (_sn) => { refreshStatus(); },
+        (_ss, _slIndex) => { refreshStatus(); },
+      ));
     }
 
     async function refreshStatus() {

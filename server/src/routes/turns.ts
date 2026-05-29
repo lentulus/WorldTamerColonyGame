@@ -10,13 +10,19 @@ import {
   computeM,
   computePhiT,
   computeQA,
+  computeQI,
   computeQM,
   computePowerFactor,
   computeSN,
+  computeSS,
+  computeSLDecay,
+  computeSLReplenishment,
+  computeSLIndex,
 } from '../engine/production.js';
+import { getSlBaseline } from '../db/colonies.js';
 import type {
   TurnResolution, EventEffects,
-  RationAllocation, MaterialsAllocation,
+  RationAllocation, MaterialsAllocation, IndustrialAllocation,
 } from '@worldtamer/shared';
 
 const turns = new Hono();
@@ -66,7 +72,8 @@ turns.post('/:id/turn/start', (c) => {
 
   const prevTurn = db.prepare(`
     SELECT sn, ss, al, ac, il, ic_light, ic_heavy, ic_construction, ml, mc,
-           power_kw, raw_materials_t, rations, total_laborers, infrastructure_efficiency
+           power_kw, raw_materials_t, rations, total_laborers, infrastructure_efficiency,
+           sl_value_per_person, housing_m3
     FROM colony_turns WHERE colony_id = ? ORDER BY month DESC LIMIT 1
   `).get(id) as Record<string, number> | undefined;
 
@@ -170,8 +177,9 @@ turns.post('/:id/turn/start', (c) => {
     ?? { base_output_rations: 0, rm_t_per_month: 0 };
 
   const indRef = db.prepare(
-    'SELECT kw_per_unit FROM ref_industry_tl WHERE tl = ?'
-  ).get(tl) as { kw_per_unit: number } | undefined ?? { kw_per_unit: 0 };
+    'SELECT kw_per_unit, output_cr_per_il_month FROM ref_industry_tl WHERE tl = ?'
+  ).get(tl) as { kw_per_unit: number; output_cr_per_il_month: number } | undefined
+    ?? { kw_per_unit: 0, output_cr_per_il_month: 0 };
 
   const matRef = db.prepare(
     'SELECT base_output_t_per_month, kw_per_unit FROM ref_materials_tl WHERE tl = ?'
@@ -200,7 +208,11 @@ turns.post('/:id/turn/start', (c) => {
   const M_M = computeM(ml, mc);
   const q_m = computeQM(M_M, matRef.base_output_t_per_month, Number(colRow.rvm), eta, powerFactor) * matMult;
 
-  const rations_available      = q_a + rations;
+  const il   = prevTurn?.il ?? 0;
+  const M_I  = computeM(il, icTotal);
+  const q_i  = computeQI(M_I, indRef.output_cr_per_il_month, eta, powerFactor) * indMult;
+
+  const rations_available       = q_a + rations;
   const raw_materials_available = q_m + rawMat;
 
   // ── Build and persist TurnResolution ─────────────────────────────────────
@@ -231,6 +243,7 @@ turns.post('/:id/turn/start', (c) => {
     active_event_dms: {},
     q_a,
     q_m,
+    q_i,
     rations_available,
     raw_materials_available,
   };
@@ -317,6 +330,72 @@ turns.post('/:id/turn/allocate-materials', async (c) => {
     q_m:                       resolution.q_m,
     raw_materials_available:   resolution.raw_materials_available,
     allocation:                body,
+  }, 200);
+});
+
+// ── POST /api/colonies/:id/turn/allocate-industrial ───────────────────────────
+
+turns.post('/:id/turn/allocate-industrial', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) return c.json({ error: 'Invalid id' }, 400);
+
+  const db = getDb();
+  const colRow = db.prepare('SELECT active_turn_json, home_tl FROM colonies WHERE id = ?')
+    .get(id) as { active_turn_json: string | null; home_tl: number } | undefined;
+  if (!colRow) return c.json({ error: 'Colony not found' }, 404);
+  if (!colRow.active_turn_json) return c.json({ error: 'No active turn — call turn/start first' }, 409);
+
+  const resolution = JSON.parse(colRow.active_turn_json) as TurnResolution;
+
+  const prevTurn = db.prepare(`
+    SELECT total_laborers, housing_m3, sl_value_per_person
+    FROM colony_turns WHERE colony_id = ? ORDER BY month DESC LIMIT 1
+  `).get(id) as { total_laborers: number; housing_m3: number; sl_value_per_person: number } | undefined;
+  const totalLaborers      = prevTurn?.total_laborers ?? 0;
+  const prevHousing        = prevTurn?.housing_m3 ?? 0;
+  const prevSlValue        = prevTurn?.sl_value_per_person ?? 0;
+
+  const body = await c.req.json() as IndustrialAllocation;
+  const {
+    to_capital_cr, to_housing_cr, to_consumer_goods_cr,
+    to_armed_forces_cr, to_export_cr, to_road_network_cr,
+  } = body;
+  const allocTotal = to_capital_cr + to_housing_cr + to_consumer_goods_cr
+                   + to_armed_forces_cr + to_export_cr + to_road_network_cr;
+
+  if (allocTotal > resolution.q_i + 0.001) {
+    return c.json({
+      error: `Allocation (${allocTotal.toFixed(0)}) exceeds industrial output (${resolution.q_i.toFixed(0)})`,
+    }, 400);
+  }
+
+  // Housing construction: 100 Cr → 1 m³
+  const new_housing_m3 = prevHousing + to_housing_cr / 100;
+
+  // SL: decay existing value then add consumer goods replenishment
+  const sl_after_decay  = computeSLDecay(prevSlValue);
+  const sl_added        = computeSLReplenishment(to_consumer_goods_cr, totalLaborers);
+  const new_sl_value    = sl_after_decay + sl_added;
+
+  const ss              = computeSS(new_housing_m3, totalLaborers);
+  const sl_baseline     = getSlBaseline(colRow.home_tl);
+  const sl_index        = computeSLIndex(new_sl_value, sl_baseline);
+
+  resolution.industrial_allocation = body;
+  resolution.ss       = ss;
+  resolution.sl_value = new_sl_value;
+  resolution.sl_index = sl_index;
+
+  db.prepare('UPDATE colonies SET active_turn_json = ? WHERE id = ?')
+    .run(JSON.stringify(resolution), id);
+
+  return c.json({
+    q_i:           resolution.q_i,
+    allocation:    body,
+    new_housing_m3,
+    ss,
+    sl_value:      new_sl_value,
+    sl_index,
   }, 200);
 });
 

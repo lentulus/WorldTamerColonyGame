@@ -1,5 +1,5 @@
 import type { TurnResolution, ColonyTurn } from '@worldtamer/shared';
-import { allocateRations, allocateMaterials } from '../api/turns.js';
+import { allocateRations, allocateMaterials, allocateIndustrial } from '../api/turns.js';
 
 function fmt(n: number, dp = 1): string {
   return n.toLocaleString('en', { maximumFractionDigits: dp });
@@ -187,12 +187,103 @@ function buildMaterialsSection(
   return section;
 }
 
+// ── Industrial output section ─────────────────────────────────────────────────
+
+function buildIndustrialSection(
+  resolution: TurnResolution,
+  onAllocated: (ss: number, slIndex: number) => void,
+): HTMLElement {
+  const qi = resolution.q_i;
+
+  const section = document.createElement('div');
+  section.className = 'alloc-section';
+  section.innerHTML = `
+    <div class="alloc-header">Industrial Output</div>
+    <div class="alloc-info">
+      <div class="alloc-row alloc-total"><span>Available</span><span>${fmt(qi)} Cr</span></div>
+    </div>
+    <div class="alloc-fields">
+      ${numInput('in-cap', 'New capital',    qi)}
+      ${numInput('in-hou', 'Housing (100Cr/m³)', qi)}
+      ${numInput('in-cg',  'Consumer goods', qi)}
+      ${numInput('in-afl', 'Armed forces',   qi)}
+      ${numInput('in-exp', 'Export',         qi)}
+      ${numInput('in-rd',  'Road network',   qi)}
+    </div>
+    <div class="alloc-balance">
+      Remaining: <span id="in-remaining">${fmt(qi)} Cr</span>
+    </div>
+    <div id="in-housing-preview" class="alloc-sn-preview" style="display:none"></div>
+    <div id="in-error" class="error-msg" style="display:none"></div>
+    <button id="in-submit" class="btn-alloc">Submit Industrial</button>
+  `;
+
+  const inputs   = section.querySelectorAll<HTMLInputElement>('.alloc-input');
+  const remEl    = section.querySelector<HTMLSpanElement>('#in-remaining')!;
+  const preview  = section.querySelector<HTMLDivElement>('#in-housing-preview')!;
+  const errEl    = section.querySelector<HTMLDivElement>('#in-error')!;
+  const submitBtn = section.querySelector<HTMLButtonElement>('#in-submit')!;
+
+  function updateBalance() {
+    const cap = Number(section.querySelector<HTMLInputElement>('#in-cap')!.value) || 0;
+    const hou = Number(section.querySelector<HTMLInputElement>('#in-hou')!.value) || 0;
+    const cg  = Number(section.querySelector<HTMLInputElement>('#in-cg')!.value)  || 0;
+    const afl = Number(section.querySelector<HTMLInputElement>('#in-afl')!.value) || 0;
+    const exp = Number(section.querySelector<HTMLInputElement>('#in-exp')!.value) || 0;
+    const rd  = Number(section.querySelector<HTMLInputElement>('#in-rd')!.value)  || 0;
+    const rem = qi - cap - hou - cg - afl - exp - rd;
+    remEl.textContent = `${fmt(rem)} Cr`;
+    remEl.style.color = rem < -0.01 ? 'var(--color-warn)' : '';
+
+    if (hou > 0) {
+      preview.style.display = 'block';
+      preview.textContent = `+${fmt(hou / 100, 0)} m³ housing from construction`;
+    } else {
+      preview.style.display = 'none';
+    }
+  }
+
+  inputs.forEach(inp => inp.addEventListener('input', updateBalance));
+  updateBalance();
+
+  submitBtn.addEventListener('click', async () => {
+    errEl.style.display = 'none';
+    const cap = Number(section.querySelector<HTMLInputElement>('#in-cap')!.value) || 0;
+    const hou = Number(section.querySelector<HTMLInputElement>('#in-hou')!.value) || 0;
+    const cg  = Number(section.querySelector<HTMLInputElement>('#in-cg')!.value)  || 0;
+    const afl = Number(section.querySelector<HTMLInputElement>('#in-afl')!.value) || 0;
+    const exp = Number(section.querySelector<HTMLInputElement>('#in-exp')!.value) || 0;
+    const rd  = Number(section.querySelector<HTMLInputElement>('#in-rd')!.value)  || 0;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting…';
+    try {
+      const result = await allocateIndustrial(resolution.colony_id, {
+        to_capital_cr: cap, to_housing_cr: hou, to_consumer_goods_cr: cg,
+        to_armed_forces_cr: afl, to_export_cr: exp, to_road_network_cr: rd,
+      });
+      submitBtn.textContent =
+        `Submitted — SS ${result.ss.toFixed(0)} m³ · SL ${result.sl_index >= 0 ? '+' : ''}${result.sl_index}`;
+      inputs.forEach(inp => { inp.disabled = true; });
+      onAllocated(result.ss, result.sl_index);
+    } catch (err) {
+      errEl.textContent = (err as Error).message;
+      errEl.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit Industrial';
+    }
+  });
+
+  return section;
+}
+
 // ── AllocationPanel ───────────────────────────────────────────────────────────
 
 export function AllocationPanel(
   resolution: TurnResolution | null,
   turn: ColonyTurn,
   onSnUpdated: (sn: number) => void,
+  onIndustrialAllocated?: (ss: number, slIndex: number) => void,
 ): HTMLElement {
   const root = document.createElement('div');
   root.className = 'alloc-panel';
@@ -211,12 +302,15 @@ export function AllocationPanel(
 
   root.appendChild(buildRationsSection(resolution, turn, onSnUpdated));
   root.appendChild(buildMaterialsSection(resolution, turn));
+  root.appendChild(buildIndustrialSection(resolution, (ss, slIndex) => {
+    onIndustrialAllocated?.(ss, slIndex);
+  }));
 
   const future = document.createElement('p');
   future.className = 'muted';
   future.style.marginTop = '0.75rem';
   future.style.fontSize = '0.8em';
-  future.textContent = 'Industrial allocation and labour reassignment arrive in Slice 5–6.';
+  future.textContent = 'Labour reassignment and turn finalization arrive in Slice 6.';
   root.appendChild(future);
 
   return root;

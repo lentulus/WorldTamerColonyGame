@@ -6,6 +6,11 @@ import {
   computeSN,
   computeQM,
   computePowerFactor,
+  computeQI,
+  computeSS,
+  computeSLDecay,
+  computeSLReplenishment,
+  computeSLIndex,
 } from './production.js';
 
 // ── computeM ──────────────────────────────────────────────────────────────────
@@ -148,5 +153,113 @@ describe('computePowerFactor()', () => {
   });
   it('no capital requires no power → 1.0  (pre-industrial)', () => {
     expect(computePowerFactor(0, 0, 0, 1.2, 1.2)).toBe(1.0);
+  });
+});
+
+// ── computeQI ─────────────────────────────────────────────────────────────────
+// Industrial output (credits).
+// Q_I = M_I × q_I × eta × powerFactor
+// No seasonal factor; no R_A (materials supply is player-allocated separately).
+// TL 8: output_cr_per_il_month = 1500 (from ref_industry_tl seed).
+
+describe('computeQI()', () => {
+  it('TL 8 baseline: (20, 1500, 1, 1) → 30 000  (M_I=20 × q_I=1500)', () => {
+    expect(computeQI(20, 1500, 1, 1)).toBe(30_000);
+  });
+  it('road penalty: (20, 1500, 0.6, 1) → 18 000  (×0.6 eta)', () => {
+    expect(computeQI(20, 1500, 0.6, 1)).toBeCloseTo(18_000, 4);
+  });
+  it('half power: (20, 1500, 1, 0.5) → 15 000', () => {
+    expect(computeQI(20, 1500, 1, 0.5)).toBeCloseTo(15_000, 4);
+  });
+  it('no laborers: (0, 1500, 1, 1) → 0', () => {
+    expect(computeQI(0, 1500, 1, 1)).toBe(0);
+  });
+});
+
+// ── computeSS ─────────────────────────────────────────────────────────────────
+// Standard of Shelter = housing_m3 / totalLaborers (raw m³ per laborer).
+// ref_ss_table bands: 0–24, 25–50, 51–80, 81–120, 121–160, 161–250, 251–350, 351+
+
+describe('computeSS()', () => {
+  it('(2400, 100) → 24.0  (top of worst band)', () => {
+    expect(computeSS(2400, 100)).toBeCloseTo(24.0, 6);
+  });
+  it('(2500, 100) → 25.0  (bottom of next band)', () => {
+    expect(computeSS(2500, 100)).toBeCloseTo(25.0, 6);
+  });
+  it('(10000, 100) → 100.0  (neutral 81–120 band)', () => {
+    expect(computeSS(10_000, 100)).toBeCloseTo(100.0, 6);
+  });
+  it('(35000, 100) → 350.0  (top of 251–350 band)', () => {
+    expect(computeSS(35_000, 100)).toBeCloseTo(350.0, 6);
+  });
+  it('(0, 100) → 0.0', () => {
+    expect(computeSS(0, 100)).toBe(0);
+  });
+  it('zero laborers → 0  (guard against division by zero)', () => {
+    expect(computeSS(10_000, 0)).toBe(0);
+  });
+});
+
+// ── computeSLDecay ────────────────────────────────────────────────────────────
+// SL goods value decays 2% per month: prev × 0.98
+
+describe('computeSLDecay()', () => {
+  it('(1000) → 980  (1000 × 0.98)', () => {
+    expect(computeSLDecay(1000)).toBeCloseTo(980, 6);
+  });
+  it('(250) → 245  (TL 8 baseline × 0.98)', () => {
+    expect(computeSLDecay(250)).toBeCloseTo(245, 6);
+  });
+  it('(0) → 0', () => {
+    expect(computeSLDecay(0)).toBe(0);
+  });
+});
+
+// ── computeSLReplenishment ────────────────────────────────────────────────────
+// Credits allocated to consumer goods → added SL value per person.
+
+describe('computeSLReplenishment()', () => {
+  it('(1000, 100) → 10.0  (1000 Cr ÷ 100 laborers)', () => {
+    expect(computeSLReplenishment(1000, 100)).toBeCloseTo(10.0, 6);
+  });
+  it('(5000, 200) → 25.0', () => {
+    expect(computeSLReplenishment(5000, 200)).toBeCloseTo(25.0, 6);
+  });
+  it('(0, 100) → 0', () => {
+    expect(computeSLReplenishment(0, 100)).toBe(0);
+  });
+});
+
+// ── computeSLIndex ────────────────────────────────────────────────────────────
+// DM from SL ratio (sl_value / baseline_sl_value).
+// Bands: ≥1.20→+2, [1.05,1.20)→+1, [0.95,1.05)→0, [0.75,0.95)→−1,
+//        [0.50,0.75)→−2, <0.50→−3
+
+describe('computeSLIndex()', () => {
+  it('at baseline (200/200 = 1.0) → 0', () => {
+    expect(computeSLIndex(200, 200)).toBe(0);
+  });
+  it('lower neutral edge (190/200 = 0.95) → 0', () => {
+    expect(computeSLIndex(190, 200)).toBe(0);
+  });
+  it('just below neutral (188/200 = 0.94) → −1', () => {
+    expect(computeSLIndex(188, 200)).toBe(-1);
+  });
+  it('above baseline (210/200 = 1.05) → +1  (lower edge of +1 band)', () => {
+    expect(computeSLIndex(210, 200)).toBe(1);
+  });
+  it('well above (240/200 = 1.20) → +2  (lower edge of +2 band)', () => {
+    expect(computeSLIndex(240, 200)).toBe(2);
+  });
+  it('falling: below half of baseline (90/200 = 0.45) → −3', () => {
+    expect(computeSLIndex(90, 200)).toBe(-3);
+  });
+  it('mid-decline (130/200 = 0.65) → −2', () => {
+    expect(computeSLIndex(130, 200)).toBe(-2);
+  });
+  it('mild decline (180/200 = 0.90) → −1', () => {
+    expect(computeSLIndex(180, 200)).toBe(-1);
   });
 });

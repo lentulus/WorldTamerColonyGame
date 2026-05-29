@@ -212,10 +212,17 @@ export interface TurnResolution {
   rations_available: number;
   raw_materials_available: number;
 
+  // Industrial production (computed at turn/start)
+  q_i: number;
+
   // Filled in by the allocation endpoints
   rations_allocation?: RationAllocation;
   sn?: number;
   materials_allocation?: MaterialsAllocation;
+  industrial_allocation?: IndustrialAllocation;
+  ss?: number;
+  sl_value?: number;
+  sl_index?: number;
 }
 
 // ── Allocation requests ───────────────────────────────────────────────────────
