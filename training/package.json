@@ -1,0 +1,19 @@
+{
+  "name": "@worldtamer/training",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test":    "vitest run",
+    "train":   "tsx src/run_training.ts",
+    "extract": "tsx src/extract_ref_data.ts"
+  },
+  "dependencies": {
+    "@worldtamer/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.7"
+  }
+}
